@@ -401,7 +401,16 @@
                     }
                     return response.json();
                 })
-                .then(function (data) {
+                .then(async function (data) {
+                    // Check if job is async/pending
+                    if (data.status === 'pending' || data.status === 'processing') {
+                        try {
+                            data = await self.pollJob(data.id);
+                        } catch (e) {
+                            throw e;
+                        }
+                    }
+
                     var downloadUrl = self.options.getDownloadUrl.call(self, data);
                     var filename = self.options.getOutputFilename.call(self, item.file, data);
 
@@ -414,6 +423,45 @@
                 .catch(function (error) {
                     reject(error);
                 });
+        });
+    };
+
+    /**
+     * Poll job status until completion or failure
+     * @param {string} jobId - Job ID to poll
+     * @returns {Promise} - Resolves with final job data
+     */
+    MultiFileProcessor.prototype.pollJob = function (jobId) {
+        var self = this;
+        var attempts = 0;
+        var maxAttempts = 300; // 10 minutes approx (2s interval)
+
+        return new Promise(function (resolve, reject) {
+            var interval = setInterval(function () {
+                attempts++;
+                if (attempts > maxAttempts) {
+                    clearInterval(interval);
+                    reject(new Error('Processing timed out'));
+                    return;
+                }
+
+                fetch('/api/core/jobs/' + jobId + '/')
+                    .then(function (res) { return res.json(); })
+                    .then(function (job) {
+                        if (job.status === 'completed') {
+                            clearInterval(interval);
+                            resolve(job);
+                        } else if (job.status === 'failed') {
+                            clearInterval(interval);
+                            reject(new Error(job.error_message || 'Job failed'));
+                        }
+                        // Continue polling if pending/processing
+                    })
+                    .catch(function (err) {
+                        // Ignore transient network errors, but stop on 404/500 if mostly persistent
+                        console.warn('Poll error:', err);
+                    });
+            }, 2000);
         });
     };
 

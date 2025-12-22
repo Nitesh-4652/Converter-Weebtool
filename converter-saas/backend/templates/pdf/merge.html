@@ -268,12 +268,47 @@
 
             try {
                 var response = await fetch('/api/pdf/merge/', { method: 'POST', body: formData });
+
+                var contentType = response.headers.get('content-type');
+
                 if (response.ok) {
-                    var blob = await response.blob();
-                    completeProgress();
-                    downloadLink.href = URL.createObjectURL(blob);
-                    downloadLink.download = 'merged.pdf';
-                    setTimeout(function () { resultArea.style.display = 'block'; }, 900);
+                    // Check if JSON (Async) or Blob (Sync)
+                    if (contentType && contentType.includes('application/json')) {
+                        var data = await response.json();
+
+                        // Start polling if pending
+                        if (data.status === 'pending' || data.status === 'processing') {
+                            loaderStatus.textContent = 'Processing in background (Job ID: ' + data.id.substring(0, 8) + ')...';
+                            etaTime.textContent = 'Queued';
+                            progressStage.textContent = 'Job Queued';
+
+                            // Wait for job completion
+                            data = await pollJob(data.id);
+
+                            // Job done, get file
+                            if (data.download_url) {
+                                // Fetch the actual file blob now
+                                var fileResp = await fetch(data.download_url);
+                                var blob = await fileResp.blob();
+                                completeProgress();
+                                downloadLink.href = URL.createObjectURL(blob);
+                                downloadLink.download = 'merged.pdf';
+                                setTimeout(function () { resultArea.style.display = 'block'; }, 900);
+                            } else {
+                                throw new Error('Download URL missing from completed job');
+                            }
+                        } else {
+                            // Unexpected JSON
+                            throw new Error('Unexpected response format');
+                        }
+                    } else {
+                        // Sync Mode (Blob)
+                        var blob = await response.blob();
+                        completeProgress();
+                        downloadLink.href = URL.createObjectURL(blob);
+                        downloadLink.download = 'merged.pdf';
+                        setTimeout(function () { resultArea.style.display = 'block'; }, 900);
+                    }
                 } else {
                     hideLoader();
                     errorMessage.textContent = 'Merge failed';
@@ -287,6 +322,30 @@
                 setButtonLoading(false);
             }
         };
+
+        async function pollJob(jobId) {
+            return new Promise((resolve, reject) => {
+                var interval = setInterval(async () => {
+                    try {
+                        var res = await fetch('/api/core/jobs/' + jobId + '/');
+                        var job = await res.json();
+
+                        if (job.status === 'completed') {
+                            clearInterval(interval);
+                            resolve(job);
+                        } else if (job.status === 'failed') {
+                            clearInterval(interval);
+                            reject(new Error(job.error_message || 'Job failed'));
+                        } else {
+                            // Update UI
+                            loaderStatus.textContent = 'Processing... status: ' + job.status;
+                        }
+                    } catch (e) {
+                        console.warn('Poll error', e);
+                    }
+                }, 2000);
+            });
+        }
 
         window.onbeforeunload = function (e) {
             if (isProcessing) {
