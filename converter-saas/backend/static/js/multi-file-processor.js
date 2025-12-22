@@ -393,32 +393,43 @@
                 method: 'POST',
                 body: formData
             })
-                .then(function (response) {
+                .then(async function (response) {
                     if (!response.ok) {
-                        return response.json().then(function (data) {
-                            throw new Error(data.error || data.details || 'Request failed');
-                        });
+                        var data = await response.json().catch(function () { return {}; });
+                        throw new Error(data.error || data.details || 'Request failed');
                     }
-                    return response.json();
-                })
-                .then(async function (data) {
-                    // Check if job is async/pending
-                    if (data.status === 'pending' || data.status === 'processing') {
-                        try {
+
+                    var contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        var data = await response.json();
+                        // Check if job is async/pending
+                        if (data.status === 'pending' || data.status === 'processing') {
                             data = await self.pollJob(data.id);
-                        } catch (e) {
-                            throw e;
                         }
+
+                        var downloadUrl = self.options.getDownloadUrl.call(self, data);
+                        var filename = self.options.getOutputFilename.call(self, item.file, data);
+
+                        return {
+                            downloadUrl: downloadUrl,
+                            filename: filename,
+                            data: data
+                        };
+                    } else {
+                        // Handle Blob response (Synchronous)
+                        var blob = await response.blob();
+                        var downloadUrl = URL.createObjectURL(blob);
+                        var filename = self.options.getOutputFilename.call(self, item.file, {});
+
+                        return {
+                            downloadUrl: downloadUrl,
+                            filename: filename,
+                            data: { status: 'completed' }
+                        };
                     }
-
-                    var downloadUrl = self.options.getDownloadUrl.call(self, data);
-                    var filename = self.options.getOutputFilename.call(self, item.file, data);
-
-                    resolve({
-                        downloadUrl: downloadUrl,
-                        filename: filename,
-                        data: data
-                    });
+                })
+                .then(function (result) {
+                    resolve(result);
                 })
                 .catch(function (error) {
                     reject(error);

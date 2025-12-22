@@ -193,12 +193,32 @@
 
             try {
                 var response = await fetch('/api/pdf/protect/', { method: 'POST', body: new FormData(form) });
+                var contentType = response.headers.get('content-type');
+
                 if (response.ok) {
-                    var blob = await response.blob();
-                    completeProgress();
-                    downloadLink.href = URL.createObjectURL(blob);
-                    downloadLink.download = 'protected.pdf';
-                    setTimeout(function () { resultArea.style.display = 'block'; }, 600);
+                    if (contentType && contentType.includes('application/json')) {
+                        var data = await response.json();
+                        if (data.status === 'pending' || data.status === 'processing') {
+                            loaderStatus.textContent = 'Processing in background...';
+                            etaTime.textContent = 'Queued';
+                            progressStage.textContent = 'Job Queued';
+                            data = await pollJob(data.id);
+                            if (data.download_url) {
+                                var fileResp = await fetch(data.download_url);
+                                var blob = await fileResp.blob();
+                                completeProgress();
+                                downloadLink.href = URL.createObjectURL(blob);
+                                downloadLink.download = 'protected.pdf';
+                                setTimeout(function () { resultArea.style.display = 'block'; }, 600);
+                            } else { throw new Error('Download URL missing'); }
+                        } else { throw new Error('Unexpected response format'); }
+                    } else {
+                        var blob = await response.blob();
+                        completeProgress();
+                        downloadLink.href = URL.createObjectURL(blob);
+                        downloadLink.download = 'protected.pdf';
+                        setTimeout(function () { resultArea.style.display = 'block'; }, 600);
+                    }
                 } else {
                     hideLoader();
                     errorMessage.textContent = 'Protection failed';
@@ -213,6 +233,22 @@
                 convertBtn.disabled = false;
             }
         };
+
+        async function pollJob(jobId) {
+            return new Promise((resolve, reject) => {
+                var interval = setInterval(async () => {
+                    try {
+                        var res = await fetch('/api/core/jobs/' + jobId + '/');
+                        var job = await res.json();
+                        if (job.status === 'completed') resolve(job);
+                        else if (job.status === 'failed') reject(new Error(job.error_message));
+                        else loaderStatus.textContent = 'Processing... status: ' + job.status;
+
+                        if (job.status === 'completed' || job.status === 'failed') clearInterval(interval);
+                    } catch (e) { }
+                }, 2000);
+            });
+        }
 
         window.onbeforeunload = function (e) {
             if (isProcessing) { e.preventDefault(); e.returnValue = 'Processing...'; return e.returnValue; }

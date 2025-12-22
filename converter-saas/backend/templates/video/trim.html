@@ -656,16 +656,33 @@
 
             try {
                 var response = await fetch('/api/video/trim/', { method: 'POST', body: formData });
-                var data = await response.json();
+                var contentType = response.headers.get('content-type');
 
-                if (response.ok && data.download_url) {
-                    completeProgress();
-                    downloadLink.href = data.download_url;
-                    setTimeout(function () {
-                        resultArea.style.display = 'block';
-                    }, 900);
+                if (response.ok) {
+                    if (contentType && contentType.includes('application/json')) {
+                        var data = await response.json();
+                        if (data.status === 'pending' || data.status === 'processing') {
+                            loaderStatus.textContent = 'Processing in background...';
+                            etaTime.textContent = 'Queued';
+                            progressStage.textContent = 'Job Queued';
+                            data = await pollJob(data.id);
+                        }
+
+                        if (data.download_url) {
+                            completeProgress();
+                            downloadLink.href = data.download_url;
+                            setTimeout(function () { resultArea.style.display = 'block'; }, 900);
+                        } else { throw new Error('Download URL missing'); }
+                    } else {
+                        // Handle Blob
+                        var blob = await response.blob();
+                        completeProgress();
+                        downloadLink.href = URL.createObjectURL(blob);
+                        setTimeout(function () { resultArea.style.display = 'block'; }, 900);
+                    }
                 } else {
                     hideLoader();
+                    var data = await response.json().catch(function () { return {}; });
                     errorMessage.textContent = data.error || data.details || 'Trimming failed';
                     errorArea.style.display = 'block';
                 }
@@ -677,6 +694,22 @@
                 setButtonLoading(false);
             }
         };
+
+        async function pollJob(jobId) {
+            return new Promise((resolve, reject) => {
+                var interval = setInterval(async () => {
+                    try {
+                        var res = await fetch('/api/core/jobs/' + jobId + '/');
+                        var job = await res.json();
+                        if (job.status === 'completed') resolve(job);
+                        else if (job.status === 'failed') reject(new Error(job.error_message));
+                        else loaderStatus.textContent = 'Processing... status: ' + job.status;
+
+                        if (job.status === 'completed' || job.status === 'failed') clearInterval(interval);
+                    } catch (e) { }
+                }, 2000);
+            });
+        }
 
         window.onbeforeunload = function (e) {
             if (isProcessing) {

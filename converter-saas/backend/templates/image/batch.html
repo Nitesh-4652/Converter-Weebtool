@@ -281,17 +281,35 @@
                         body: formData
                     });
 
-                    var data = await response.json();
+                    var contentType = response.headers.get('content-type');
+                    var data;
 
-                    if (response.ok && data.download_url) {
-                        if (statusEl) {
-                            statusEl.className = 'batch-queue-item-status done';
-                            statusEl.textContent = '✅ Done';
+                    if (response.ok) {
+                        if (contentType && contentType.includes('application/json')) {
+                            data = await response.json();
+                            if (data.status === 'pending' || data.status === 'processing') {
+                                data = await pollJob(data.id);
+                            }
+                        } else {
+                            var blob = await response.blob();
+                            data = { download_url: URL.createObjectURL(blob) };
                         }
-                        convertedFiles.push({
-                            name: file.name.replace(/\.[^/.]+$/, '') + '.' + format,
-                            url: data.download_url
-                        });
+
+                        if (data.download_url) {
+                            if (statusEl) {
+                                statusEl.className = 'batch-queue-item-status done';
+                                statusEl.textContent = '✅ Done';
+                            }
+                            convertedFiles.push({
+                                name: file.name.replace(/\.[^/.]+$/, '') + '.' + format,
+                                url: data.download_url
+                            });
+                        } else {
+                            if (statusEl) {
+                                statusEl.className = 'batch-queue-item-status error';
+                                statusEl.textContent = '❌ Failed';
+                            }
+                        }
                     } else {
                         if (statusEl) {
                             statusEl.className = 'batch-queue-item-status error';
@@ -322,7 +340,6 @@
             if (convertedFiles.length > 0) {
                 showResults();
 
-                // Add to history
                 if (window.addToHistory) {
                     window.addToHistory({
                         tool: 'Batch Image Converter',
@@ -333,6 +350,21 @@
                 }
             }
         });
+
+        async function pollJob(jobId) {
+            return new Promise((resolve, reject) => {
+                var interval = setInterval(async () => {
+                    try {
+                        var res = await fetch('/api/core/jobs/' + jobId + '/');
+                        var job = await res.json();
+                        if (job.status === 'completed') resolve(job);
+                        else if (job.status === 'failed') reject(new Error(job.error_message));
+
+                        if (job.status === 'completed' || job.status === 'failed') clearInterval(interval);
+                    } catch (e) { }
+                }, 2000);
+            });
+        }
 
         function showResults() {
             var html = '';
