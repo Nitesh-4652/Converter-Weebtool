@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <h1>🚀 File Converter SaaS</h1>
+    <p class="hero-subtitle">Professional file conversion tools for Audio, Video, Image & PDF</p>
+</section>
+
+<section class="tools-grid">
+    {% for tool in tools %}
+    <a href="{{ tool.url }}" class="tool-card">
+        <div class="tool-icon">{{ tool.icon }}</div>
+        <h3 class="tool-name">{{ tool.name }}</h3>
+        <p class="tool-description">{{ tool.description }}</p>
+    </a>
+    {% endfor %}
+</section>
+
+<!-- Conversion History Section -->
+<section class="history-section" id="history-section" style="display: none; margin-top: 3rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>📋 Recent Conversions</h2>
+        <button class="btn" id="clear-history-btn"
+            style="background: var(--error); padding: 0.5rem 1rem; font-size: 0.875rem;">
+            🗑️ Clear History
+        </button>
+    </div>
+    <div id="history-list" class="history-list"></div>
+</section>
+
+<section class="features">
+    <h2>Why Choose Us?</h2>
+    <div class="features-grid">
+        <div class="feature">
+            <div class="feature-icon">⚡</div>
+            <h4>Fast Processing</h4>
+            <p>High-performance FFmpeg backend for quick conversions</p>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">🔒</div>
+            <h4>Secure</h4>
+            <p>Files are automatically deleted after processing</p>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">🎯</div>
+            <h4>50+ Formats</h4>
+            <p>Support for all major audio, video, image formats</p>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">💯</div>
+            <h4>Free to Use</h4>
+            <p>No registration required, convert files instantly</p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        var historySection = document.getElementById('history-section');
+        var historyList = document.getElementById('history-list');
+        var clearBtn = document.getElementById('clear-history-btn');
+
+        function getHistory() {
+            try {
+                return JSON.parse(localStorage.getItem('conversionHistory') || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveHistory(history) {
+            localStorage.setItem('conversionHistory', JSON.stringify(history.slice(0, 20)));
+        }
+
+        function formatDate(timestamp) {
+            var date = new Date(timestamp);
+            var now = new Date();
+            var diff = now - date;
+
+            if (diff < 60000) return 'Just now';
+            if (diff < 3600000) return Math.floor(diff / 60000) + ' min ago';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + ' hours ago';
+            return date.toLocaleDateString();
+        }
+
+        function getToolIcon(type) {
+            var icons = {
+                'video': '🎬',
+                'audio': '🎵',
+                'image': '🖼️',
+                'pdf': '📄'
+            };
+            return icons[type] || '📁';
+        }
+
+        function renderHistory() {
+            var history = getHistory();
+
+            if (history.length === 0) {
+                historySection.style.display = 'none';
+                return;
+            }
+
+            historySection.style.display = 'block';
+            historyList.innerHTML = '';
+
+            history.forEach(function (item, index) {
+                var div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML =
+                    '<div class="history-icon">' + getToolIcon(item.type) + '</div>' +
+                    '<div class="history-details">' +
+                    '<div class="history-filename">' + (item.filename || 'Unknown file') + '</div>' +
+                    '<div class="history-meta">' +
+                    '<span>' + (item.operation || 'Converted') + '</span>' +
+                    '<span>→ ' + (item.outputFormat || '').toUpperCase() + '</span>' +
+                    '<span class="history-time">' + formatDate(item.timestamp) + '</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="history-status ' + (item.success ? 'success' : 'failed') + '">' +
+                    (item.success ? '✅' : '❌') +
+                    '</div>';
+                historyList.appendChild(div);
+            });
+        }
+
+        clearBtn.onclick = function () {
+            if (confirm('Clear all conversion history?')) {
+                localStorage.removeItem('conversionHistory');
+                renderHistory();
+            }
+        };
+
+        // Initial render
+        renderHistory();
+
+        // Make addToHistory available globally for other pages
+        window.addToHistory = function (item) {
+            var history = getHistory();
+            history.unshift({
+                filename: item.filename,
+                type: item.type,
+                operation: item.operation,
+                outputFormat: item.outputFormat,
+                success: item.success !== false,
+                timestamp: Date.now()
+            });
+            saveHistory(history);
+        };
+    })();
+</script>
+
+<style>
+    .history-section {
+        background: var(--bg-card);
+        border-radius: var(--radius);
+        padding: 2rem;
+        border: 1px solid var(--border);
+    }
+
+    .history-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .history-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: var(--dark);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        transition: all 0.2s;
+    }
+
+    .history-item:hover {
+        border-color: var(--primary);
+    }
+
+    .history-icon {
+        font-size: 1.5rem;
+    }
+
+    .history-details {
+        flex: 1;
+    }
+
+    .history-filename {
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+
+    .history-meta {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.85rem;
+        color: var(--gray-light);
+    }
+
+    .history-time {
+        margin-left: auto;
+    }
+
+    .history-status {
+        font-size: 1.25rem;
+    }
+
+    .history-status.success {
+        color: var(--success);
+    }
+
+    .history-status.failed {
+        color: var(--error);
+    }
+</style>
+{% endblock %}

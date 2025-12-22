@@ -1,0 +1,114 @@
+📄 COMPLETE PDF CONVERTER – PERFECT FEATURE LIST
+🟢 A) FILE → PDF (Create PDF)
+
+Word → PDF – ⭐⭐⭐⭐⭐
+DOC/DOCX files ko fixed-layout, share-ready PDF me convert karta hai.
+
+Excel → PDF – ⭐⭐⭐⭐⭐
+Spreadsheets ko print-friendly PDF format me badalta hai.
+
+PowerPoint → PDF – ⭐⭐⭐⭐
+Presentation slides ko non-editable PDF me convert karta hai.
+
+Image → PDF (JPG, PNG, WEBP) – ⭐⭐⭐⭐⭐
+Images ko single ya multi-page PDF document me convert karta hai.
+
+Text → PDF (TXT) – ⭐⭐⭐
+Plain text files ko readable PDF document banata hai.
+
+HTML → PDF – ⭐⭐⭐⭐
+Web pages ya templates ko PDF me export karta hai.
+
+Markdown → PDF – ⭐⭐⭐
+Developer docs ko formatted PDF me convert karta hai.
+
+CSV → PDF – ⭐⭐⭐
+Tabular data ko PDF report format me badalta hai.
+
+🔵 B) PDF → FILE (Convert PDF)
+
+PDF → Word – ⭐⭐⭐⭐⭐
+PDF content ko editable DOCX format me convert karta hai.
+
+PDF → Excel – ⭐⭐⭐⭐⭐
+Tables aur numeric data ko spreadsheet me extract karta hai.
+
+PDF → PowerPoint – ⭐⭐⭐⭐
+PDF pages ko presentation slides me convert karta hai.
+
+PDF → JPG – ⭐⭐⭐⭐⭐
+PDF pages ko image files me convert karta hai.
+
+PDF → PNG – ⭐⭐⭐⭐
+High-quality images ke liye PDF ko PNG me convert karta hai.
+
+PDF → Text (TXT) – ⭐⭐⭐⭐
+PDF se plain text content extract karta hai.
+
+PDF → HTML – ⭐⭐⭐
+PDF ko web-friendly HTML format me convert karta hai.
+
+PDF → EPUB – ⭐⭐⭐
+PDF documents ko eBook format me convert karta hai.
+
+🟣 C) PDF ↔ PDF (Tools & Utilities)
+
+Merge PDF – ⭐⭐⭐⭐⭐
+Multiple PDF files ko ek single PDF me jodta hai.
+
+Split PDF – ⭐⭐⭐⭐⭐
+PDF ko pages ya page-range ke hisaab se todta hai.
+
+Compress PDF – ⭐⭐⭐⭐⭐
+PDF file size kam karta hai bina zyada quality loss ke.
+
+Rotate PDF – ⭐⭐⭐
+PDF pages ka orientation change karta hai.
+
+Reorder Pages – ⭐⭐⭐
+PDF pages ka order change karta hai.
+
+Delete Pages – ⭐⭐⭐
+Unwanted pages PDF se remove karta hai.
+
+Unlock PDF – ⭐⭐⭐⭐
+Password-protected PDF se security remove karta hai.
+
+Protect PDF – ⭐⭐⭐⭐
+PDF par password aur permission lock lagata hai.
+
+🔥 CORE FEATURES (Minimum Required for Any PDF Website)
+
+👉 Word↔PDF
+👉 Excel↔PDF
+👉 Image↔PDF
+👉 PDF→JPG
+👉 Merge / Split / Compress PDF
+
+💡 PRO TIP (Portfolio + Money)
+
+Agar tum sirf yeh 10 features bana lo 👇
+
+Word→PDF
+
+PDF→Word
+
+Image→PDF
+
+PDF→JPG
+
+Merge
+
+Split
+
+Compress
+
+Protect
+
+Unlock
+
+Rotate
+
+👉 Yehi ek full PDF SaaS product ban jata hai 💰
+
+Text → Uppercase / Lowercase

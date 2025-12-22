@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ title|default:"File Converter" }}{% endblock %} | Converter SaaS</title>
+    <meta name="description"
+        content="{% block description %}Professional file conversion tools - Audio, Video, Image, PDF{% endblock %}">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Base CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    <!-- Theme Initialization (prevent flash) -->
+    <script>
+        (function () {
+            var theme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <span class="logo-icon">⚡</span>
+                <span class="logo-text">Converter SaaS</span>
+            </a>
+            <div class="nav-links">
+                <a href="/audio/" class="nav-link">🎵 Audio</a>
+                <a href="/video/" class="nav-link">🎬 Video</a>
+                <a href="/image/" class="nav-link">🖼️ Image</a>
+                <a href="/pdf/" class="nav-link">📄 PDF</a>
+                <button class="history-toggle" id="history-toggle" title="Conversion History">
+                    📋
+                    <span class="history-badge" id="history-badge" style="display:none;">0</span>
+                </button>
+                <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+                    <span class="theme-icon-dark">🌙</span>
+                    <span class="theme-icon-light">☀️</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- History Overlay -->
+    <div class="history-overlay" id="history-overlay"></div>
+
+    <!-- History Panel -->
+    <div class="history-panel" id="history-panel">
+        <div class="history-header">
+            <h3>📋 Conversion History</h3>
+            <button class="history-close" id="history-close">&times;</button>
+        </div>
+        <div class="history-content" id="history-content">
+            <!-- History items will be rendered here -->
+        </div>
+        <div class="history-footer">
+            <button class="history-clear" id="history-clear">🗑️ Clear History</button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 Converter SaaS. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Base JS -->
+    <script src="/static/js/main.js"></script>
+
+    <!-- Theme Toggle Script -->
+    <script>
+        (function () {
+            var toggle = document.getElementById('theme-toggle');
+            var html = document.documentElement;
+
+            function updateTheme(theme) {
+                html.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+            }
+
+            toggle.addEventListener('click', function () {
+                var currentTheme = html.getAttribute('data-theme') || 'dark';
+                var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                updateTheme(newTheme);
+            });
+        })();
+    </script>
+
+    <!-- Conversion History Script -->
+    <script>
+        (function () {
+            var HISTORY_KEY = 'converter_history';
+            var MAX_HISTORY = 50;
+
+            var historyToggle = document.getElementById('history-toggle');
+            var historyPanel = document.getElementById('history-panel');
+            var historyOverlay = document.getElementById('history-overlay');
+            var historyClose = document.getElementById('history-close');
+            var historyContent = document.getElementById('history-content');
+            var historyClear = document.getElementById('history-clear');
+            var historyBadge = document.getElementById('history-badge');
+
+            // Get history from LocalStorage
+            function getHistory() {
+                try {
+                    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+                } catch (e) {
+                    return [];
+                }
+            }
+
+            // Save history to LocalStorage
+            function saveHistory(history) {
+                try {
+                    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+                } catch (e) {
+                    console.error('Failed to save history:', e);
+                }
+            }
+
+            // Add item to history (called from converter pages)
+            window.addToHistory = function (item) {
+                var history = getHistory();
+                history.unshift({
+                    id: Date.now(),
+                    type: item.type || 'conversion',
+                    tool: item.tool || 'Unknown',
+                    icon: item.icon || '📄',
+                    fileName: item.fileName || 'Unknown file',
+                    details: item.details || '',
+                    timestamp: new Date().toISOString()
+                });
+                saveHistory(history);
+                updateBadge();
+            };
+
+            // Format timestamp
+            function formatTime(isoString) {
+                var date = new Date(isoString);
+                var now = new Date();
+                var diffMs = now - date;
+                var diffMins = Math.floor(diffMs / 60000);
+                var diffHours = Math.floor(diffMins / 60);
+                var diffDays = Math.floor(diffHours / 24);
+
+                if (diffMins < 1) return 'Just now';
+                if (diffMins < 60) return diffMins + ' min ago';
+                if (diffHours < 24) return diffHours + ' hour' + (diffHours > 1 ? 's' : '') + ' ago';
+                if (diffDays < 7) return diffDays + ' day' + (diffDays > 1 ? 's' : '') + ' ago';
+                return date.toLocaleDateString();
+            }
+
+            // Render history panel
+            function renderHistory() {
+                var history = getHistory();
+
+                if (history.length === 0) {
+                    historyContent.innerHTML = '<div class="history-empty">' +
+                        '<div class="history-empty-icon">📋</div>' +
+                        '<p>No conversions yet</p>' +
+                        '<p style="font-size: 0.85rem;">Your conversion history will appear here</p>' +
+                        '</div>';
+                    return;
+                }
+
+                var html = '';
+                history.forEach(function (item) {
+                    html += '<div class="history-item">' +
+                        '<div class="history-item-header">' +
+                        '<span class="history-item-type">' + item.icon + ' ' + item.tool + '</span>' +
+                        '<span class="history-item-time">' + formatTime(item.timestamp) + '</span>' +
+                        '</div>' +
+                        '<div class="history-item-file">' + item.fileName + '</div>' +
+                        (item.details ? '<div class="history-item-details">' + item.details + '</div>' : '') +
+                        '</div>';
+                });
+                historyContent.innerHTML = html;
+            }
+
+            // Update badge
+            function updateBadge() {
+                var count = getHistory().length;
+                if (count > 0) {
+                    historyBadge.textContent = count > 99 ? '99+' : count;
+                    historyBadge.style.display = 'flex';
+                } else {
+                    historyBadge.style.display = 'none';
+                }
+            }
+
+            // Open panel
+            function openPanel() {
+                renderHistory();
+                historyPanel.classList.add('active');
+                historyOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+
+            // Close panel
+            function closePanel() {
+                historyPanel.classList.remove('active');
+                historyOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+
+            // Event listeners
+            if (historyToggle) {
+                historyToggle.addEventListener('click', openPanel);
+            }
+            if (historyClose) {
+                historyClose.addEventListener('click', closePanel);
+            }
+            if (historyOverlay) {
+                historyOverlay.addEventListener('click', closePanel);
+            }
+
+            // Clear History Button - with null check and improved feedback
+            if (historyClear) {
+                historyClear.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (confirm('Clear all conversion history?')) {
+                        try {
+                            // Clear from localStorage
+                            localStorage.removeItem(HISTORY_KEY);
+
+                            // Update UI immediately
+                            renderHistory();
+                            updateBadge();
+
+                            // Visual feedback
+                            historyClear.textContent = '✅ Cleared!';
+                            historyClear.disabled = true;
+
+                            // Reset button after 1.5 seconds
+                            setTimeout(function () {
+                                historyClear.textContent = '🗑️ Clear History';
+                                historyClear.disabled = false;
+                            }, 1500);
+
+                            console.log('History cleared successfully');
+                        } catch (err) {
+                            console.error('Failed to clear history:', err);
+                            alert('Failed to clear history. Please try again.');
+                        }
+                    }
+                });
+            } else {
+                console.warn('History clear button not found');
+            }
+
+            // Keyboard shortcut (Escape to close)
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && historyPanel && historyPanel.classList.contains('active')) {
+                    closePanel();
+                }
+            });
+
+            // Initialize badge on load
+            updateBadge();
+        })();
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

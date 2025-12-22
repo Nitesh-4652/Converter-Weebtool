@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}Batch Image Converter{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>🖼️ Batch Image Converter</h1>
+    <p>Convert multiple images at once - drag & drop supported</p>
+</section>
+
+<div class="converter-container">
+    <form id="batch-form" class="converter-form" enctype="multipart/form-data">
+        <!-- Enhanced Drag & Drop Upload Area -->
+        <label class="upload-area" id="upload-area" for="batch-file-input">
+            <input type="file" id="batch-file-input" name="files" accept="image/*" multiple style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">🖼️</div>
+                <p>Click to select images or <span class="drop-zone-text">drag & drop</span></p>
+                <p class="upload-hint">Select multiple files (hold Ctrl/Cmd) or drop them here</p>
+            </div>
+        </label>
+
+        <!-- Batch Queue -->
+        <div class="batch-queue" id="batch-queue" style="display:none;">
+            <div class="batch-queue-header">
+                <div class="batch-queue-title">
+                    <span>📋 Files Queue</span>
+                    <span class="batch-queue-count" id="queue-count">0</span>
+                </div>
+                <button type="button" class="batch-queue-clear" id="clear-queue">Clear All</button>
+            </div>
+            <div class="batch-queue-list" id="queue-list"></div>
+            <div class="batch-progress" id="batch-progress" style="display:none;">
+                <div class="batch-progress-text">
+                    <span id="progress-text">Converting...</span>
+                    <span id="progress-count">0/0</span>
+                </div>
+                <div class="batch-progress-bar">
+                    <div class="batch-progress-fill" id="progress-fill" style="width:0%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="output_format">Output Format</label>
+            <select id="output_format" name="output_format" required>
+                <option value="png">PNG</option>
+                <option value="jpg">JPEG</option>
+                <option value="webp">WebP</option>
+                <option value="gif">GIF</option>
+                <option value="bmp">BMP</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="quality">Quality</label>
+            <select id="quality" name="quality">
+                <option value="95">95% (Best)</option>
+                <option value="85" selected>85% (High)</option>
+                <option value="75">75% (Medium)</option>
+                <option value="60">60% (Low)</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn" disabled>
+            <span class="btn-text">Convert All Images</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <!-- Batch Results -->
+    <div class="batch-results" id="batch-results" style="display:none;">
+        <div class="batch-results-header">
+            <div class="batch-results-title">
+                <span>✅</span>
+                <span>Conversion Complete!</span>
+            </div>
+        </div>
+        <div class="batch-results-list" id="results-list"></div>
+    </div>
+
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // ========================================
+        // Elements
+        // ========================================
+        var uploadArea = document.getElementById('upload-area');
+        var fileInput = document.getElementById('batch-file-input');
+        var uploadContent = document.getElementById('upload-content');
+        var batchQueue = document.getElementById('batch-queue');
+        var queueList = document.getElementById('queue-list');
+        var queueCount = document.getElementById('queue-count');
+        var clearQueueBtn = document.getElementById('clear-queue');
+        var batchProgress = document.getElementById('batch-progress');
+        var progressText = document.getElementById('progress-text');
+        var progressCount = document.getElementById('progress-count');
+        var progressFill = document.getElementById('progress-fill');
+        var form = document.getElementById('batch-form');
+        var convertBtn = document.getElementById('convert-btn');
+        var batchResults = document.getElementById('batch-results');
+        var resultsList = document.getElementById('results-list');
+        var errorArea = document.getElementById('error-area');
+        var errorMessage = document.getElementById('error-message');
+
+        // State
+        var fileQueue = [];
+        var isProcessing = false;
+        var convertedFiles = [];
+
+        // ========================================
+        // Utility Functions
+        // ========================================
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        // ========================================
+        // Drag & Drop Handlers
+        // ========================================
+
+        uploadArea.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+
+            var files = e.dataTransfer.files;
+            if (files.length > 0) {
+                addFilesToQueue(files);
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', function () {
+            if (fileInput.files.length > 0) {
+                addFilesToQueue(fileInput.files);
+                fileInput.value = ''; // Reset so same files can be added again
+            }
+        });
+
+        // ========================================
+        // Queue Management
+        // ========================================
+
+        function addFilesToQueue(files) {
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                // Check if already in queue
+                var exists = fileQueue.some(function (f) {
+                    return f.name === file.name && f.size === file.size;
+                });
+                if (!exists && file.type.startsWith('image/')) {
+                    fileQueue.push(file);
+                }
+            }
+            updateQueueUI();
+        }
+
+        function removeFromQueue(index) {
+            fileQueue.splice(index, 1);
+            updateQueueUI();
+        }
+
+        function clearQueue() {
+            fileQueue = [];
+            convertedFiles = [];
+            updateQueueUI();
+            batchResults.style.display = 'none';
+            errorArea.style.display = 'none';
+        }
+
+        function updateQueueUI() {
+            if (fileQueue.length === 0) {
+                batchQueue.style.display = 'none';
+                uploadContent.style.display = 'block';
+                convertBtn.disabled = true;
+                return;
+            }
+
+            uploadContent.style.display = 'none';
+            batchQueue.style.display = 'block';
+            queueCount.textContent = fileQueue.length;
+            convertBtn.disabled = false;
+
+            var html = '';
+            fileQueue.forEach(function (file, index) {
+                html += '<div class="batch-queue-item" data-index="' + index + '">' +
+                    '<div class="batch-queue-item-info">' +
+                    '<span class="batch-queue-item-icon">🖼️</span>' +
+                    '<span class="batch-queue-item-name">' + file.name + '</span>' +
+                    '<span class="batch-queue-item-size">' + formatSize(file.size) + '</span>' +
+                    '</div>' +
+                    '<div class="batch-queue-item-status pending" id="status-' + index + '">⏳ Pending</div>' +
+                    '<button type="button" class="batch-queue-item-remove" data-index="' + index + '">&times;</button>' +
+                    '</div>';
+            });
+            queueList.innerHTML = html;
+
+            // Add remove handlers
+            queueList.querySelectorAll('.batch-queue-item-remove').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!isProcessing) {
+                        removeFromQueue(parseInt(btn.dataset.index));
+                    }
+                });
+            });
+        }
+
+        clearQueueBtn.addEventListener('click', clearQueue);
+
+        // ========================================
+        // Batch Conversion
+        // ========================================
+
+        form.addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            if (isProcessing || fileQueue.length === 0) return;
+
+            isProcessing = true;
+            convertedFiles = [];
+            batchResults.style.display = 'none';
+            errorArea.style.display = 'none';
+            batchProgress.style.display = 'block';
+            convertBtn.classList.add('processing');
+            convertBtn.disabled = true;
+
+            var format = document.getElementById('output_format').value;
+            var quality = document.getElementById('quality').value;
+            var total = fileQueue.length;
+            var completed = 0;
+
+            for (var i = 0; i < fileQueue.length; i++) {
+                var file = fileQueue[i];
+                var statusEl = document.getElementById('status-' + i);
+
+                // Update status to processing
+                if (statusEl) {
+                    statusEl.className = 'batch-queue-item-status processing';
+                    statusEl.textContent = '⚙️ Converting...';
+                }
+
+                progressText.textContent = 'Converting: ' + file.name;
+                progressCount.textContent = (completed + 1) + '/' + total;
+                progressFill.style.width = ((completed / total) * 100) + '%';
+
+                try {
+                    var formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('output_format', format);
+                    formData.append('quality', quality);
+
+                    var response = await fetch('/api/image/convert/', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    var data = await response.json();
+
+                    if (response.ok && data.download_url) {
+                        if (statusEl) {
+                            statusEl.className = 'batch-queue-item-status done';
+                            statusEl.textContent = '✅ Done';
+                        }
+                        convertedFiles.push({
+                            name: file.name.replace(/\.[^/.]+$/, '') + '.' + format,
+                            url: data.download_url
+                        });
+                    } else {
+                        if (statusEl) {
+                            statusEl.className = 'batch-queue-item-status error';
+                            statusEl.textContent = '❌ Failed';
+                        }
+                    }
+                } catch (err) {
+                    if (statusEl) {
+                        statusEl.className = 'batch-queue-item-status error';
+                        statusEl.textContent = '❌ Error';
+                    }
+                }
+
+                completed++;
+                progressFill.style.width = ((completed / total) * 100) + '%';
+            }
+
+            // Complete
+            progressText.textContent = 'Complete!';
+            progressCount.textContent = completed + '/' + total;
+            progressFill.style.width = '100%';
+
+            isProcessing = false;
+            convertBtn.classList.remove('processing');
+            convertBtn.disabled = false;
+
+            // Show results
+            if (convertedFiles.length > 0) {
+                showResults();
+
+                // Add to history
+                if (window.addToHistory) {
+                    window.addToHistory({
+                        tool: 'Batch Image Converter',
+                        icon: '🖼️',
+                        fileName: convertedFiles.length + ' images',
+                        details: 'Converted to ' + format.toUpperCase()
+                    });
+                }
+            }
+        });
+
+        function showResults() {
+            var html = '';
+            convertedFiles.forEach(function (file) {
+                html += '<div class="batch-result-item">' +
+                    '<span>' + file.name + '</span>' +
+                    '<a href="' + file.url + '" class="batch-result-download" download="' + file.name + '">Download</a>' +
+                    '</div>';
+            });
+            resultsList.innerHTML = html;
+            batchResults.style.display = 'block';
+        }
+
+        // Prevent navigation during processing
+        window.addEventListener('beforeunload', function (e) {
+            if (isProcessing) {
+                e.preventDefault();
+                e.returnValue = 'Batch conversion in progress. Are you sure?';
+                return e.returnValue;
+            }
+        });
+    })();
+</script>
+{% endblock %}

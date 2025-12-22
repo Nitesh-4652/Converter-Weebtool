@@ -1,0 +1,620 @@
+{% extends "base.html" %}
+{% block title %}Audio Trimmer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .media-player-section {
+        margin: 1.5rem 0;
+        padding: 1.5rem;
+        background: var(--dark);
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+    }
+
+    .audio-player-wrapper {
+        width: 100%;
+    }
+
+    .audio-player-wrapper audio {
+        width: 100%;
+        border-radius: 8px;
+    }
+
+    .time-display {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 1rem;
+        font-family: monospace;
+        font-size: 1rem;
+        color: var(--gray-light);
+    }
+
+    .current-time {
+        color: var(--primary);
+        font-weight: bold;
+        font-size: 1.25rem;
+    }
+
+    .trim-range-bar {
+        position: relative;
+        height: 40px;
+        background: var(--dark-light);
+        border-radius: 8px;
+        margin: 1rem 0;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .trim-region {
+        position: absolute;
+        top: 0;
+        height: 100%;
+        background: rgba(99, 102, 241, 0.3);
+        border-left: 3px solid var(--primary);
+        border-right: 3px solid var(--primary);
+    }
+
+    .playhead {
+        position: absolute;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        background: #ef4444;
+        z-index: 10;
+    }
+
+    .playback-controls {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        margin-top: 1rem;
+    }
+
+    .play-btn {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary) 0%, #8b5cf6 100%);
+        border: none;
+        color: white;
+        font-size: 1.25rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+    }
+
+    .play-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .set-time-btns {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .set-time-btn {
+        padding: 0.5rem 1rem;
+        background: var(--dark-light);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--white);
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .set-time-btn:hover {
+        background: var(--primary);
+        border-color: var(--primary);
+    }
+
+    .trim-info {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: 8px;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+    }
+
+    .trim-duration {
+        color: var(--secondary);
+        font-weight: bold;
+    }
+
+    .keyboard-hint {
+        font-size: 0.8rem;
+        color: var(--gray);
+        text-align: center;
+        margin-top: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>✂️ Audio Trimmer</h1>
+    <p>Trim audio files with precise start and end times</p>
+</section>
+
+<div class="converter-container">
+    <form id="trim-form" class="converter-form" enctype="multipart/form-data">
+        <label class="upload-area" for="audio-trim-input">
+            <input type="file" id="audio-trim-input" name="file" accept="audio/*" style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">🎵</div>
+                <p>Click to select audio file</p>
+            </div>
+            <div class="file-preview" id="file-preview" style="display:none;">
+                <div class="file-info">
+                    <span class="file-icon">🎵</span>
+                    <span class="file-name" id="file-name"></span>
+                </div>
+            </div>
+        </label>
+        <button type="button" id="clear-file" class="btn"
+            style="display:none; margin-bottom:1rem; background:#ef4444;">Clear</button>
+
+        <!-- Audio Player Section -->
+        <div class="media-player-section" id="player-section" style="display:none;">
+            <div class="audio-player-wrapper">
+                <audio id="audio-player" controls style="display:none;"></audio>
+            </div>
+
+            <div class="trim-range-bar" id="trim-bar">
+                <div class="trim-region" id="trim-region"></div>
+                <div class="playhead" id="playhead"></div>
+            </div>
+
+            <div class="time-display">
+                <span>Current: <span class="current-time" id="current-time">0:00</span></span>
+                <span>Duration: <span id="total-duration">0:00</span></span>
+            </div>
+
+            <div class="playback-controls">
+                <button type="button" class="play-btn" id="play-btn">▶</button>
+                <div class="set-time-btns">
+                    <button type="button" class="set-time-btn" id="set-start-btn">📍 Set Start</button>
+                    <button type="button" class="set-time-btn" id="set-end-btn">📍 Set End</button>
+                </div>
+            </div>
+
+            <p class="keyboard-hint">Press <kbd>Space</kbd> to play/pause • Click timeline to seek</p>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="start_time">Start Time (seconds)</label>
+                <input type="number" id="start_time" name="start_time" step="0.1" min="0" value="0" required>
+            </div>
+            <div class="form-group">
+                <label for="end_time">End Time (seconds)</label>
+                <input type="number" id="end_time" name="end_time" step="0.1" min="0" required>
+            </div>
+        </div>
+
+        <div class="trim-info" id="trim-info" style="display:none;">
+            <span>Trim: <span id="trim-start-display">0:00</span> → <span id="trim-end-display">0:00</span></span>
+            <span class="trim-duration">Duration: <span id="trim-duration">0:00</span></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn">
+            <span class="btn-text">Trim Audio</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <div class="result-area" id="result-area" style="display:none;">
+        <div class="result-success">
+            <div class="result-icon">✅</div>
+            <h3>Trim Complete!</h3>
+            <a href="#" id="download-link" class="btn btn-success" download>Download Trimmed Audio</a>
+        </div>
+    </div>
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+
+<!-- Global Loader Overlay -->
+<div class="loader-overlay" id="loader-overlay">
+    <div class="loader-container">
+        <div class="loader-icon">✂️</div>
+        <h2 class="loader-title">Trimming Audio</h2>
+        <p class="loader-status" id="loader-status">Processing...</p>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-text">
+            <span id="progress-stage">Initializing...</span>
+            <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+
+        <div class="eta-display">
+            <div class="eta-label">Estimated Time Remaining</div>
+            <div class="eta-time" id="eta-time">Calculating...</div>
+        </div>
+
+        <div class="loader-warning">
+            <span class="loader-warning-icon">⚠️</span>
+            <span>Please do not refresh or close this page</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // ========================================
+        // Element References
+        // ========================================
+        var fileInput = document.getElementById('audio-trim-input');
+        var uploadContent = document.getElementById('upload-content');
+        var filePreview = document.getElementById('file-preview');
+        var fileNameSpan = document.getElementById('file-name');
+        var clearBtn = document.getElementById('clear-file');
+        var form = document.getElementById('trim-form');
+        var convertBtn = document.getElementById('convert-btn');
+        var resultArea = document.getElementById('result-area');
+        var downloadLink = document.getElementById('download-link');
+        var errorArea = document.getElementById('error-area');
+        var errorMessage = document.getElementById('error-message');
+
+        // Player elements
+        var playerSection = document.getElementById('player-section');
+        var audioPlayer = document.getElementById('audio-player');
+        var playBtn = document.getElementById('play-btn');
+        var currentTimeDisplay = document.getElementById('current-time');
+        var totalDurationDisplay = document.getElementById('total-duration');
+        var trimBar = document.getElementById('trim-bar');
+        var trimRegion = document.getElementById('trim-region');
+        var playhead = document.getElementById('playhead');
+        var setStartBtn = document.getElementById('set-start-btn');
+        var setEndBtn = document.getElementById('set-end-btn');
+
+        // Trim inputs
+        var startTimeInput = document.getElementById('start_time');
+        var endTimeInput = document.getElementById('end_time');
+        var trimInfo = document.getElementById('trim-info');
+        var trimStartDisplay = document.getElementById('trim-start-display');
+        var trimEndDisplay = document.getElementById('trim-end-display');
+        var trimDurationDisplay = document.getElementById('trim-duration');
+
+        // Loader elements
+        var loaderOverlay = document.getElementById('loader-overlay');
+        var loaderStatus = document.getElementById('loader-status');
+        var progressBar = document.getElementById('progress-bar');
+        var progressStage = document.getElementById('progress-stage');
+        var progressPercent = document.getElementById('progress-percent');
+        var etaTime = document.getElementById('eta-time');
+
+        var audioDuration = 0;
+        var objectUrl = null;
+        var isProcessing = false;
+        var progressInterval = null;
+        var currentProgress = 0;
+        var estimatedTotalTime = 0;
+        var startTime = 0;
+
+        // ========================================
+        // Utility Functions
+        // ========================================
+
+        function formatTime(seconds) {
+            if (seconds < 0 || !isFinite(seconds)) return 'Calculating...';
+            var h = Math.floor(seconds / 3600);
+            var m = Math.floor((seconds % 3600) / 60);
+            var s = Math.floor(seconds % 60);
+            if (h > 0) {
+                return h + ':' + m.toString().padStart(2, '0') + ':' + s.toString().padStart(2, '0');
+            }
+            return m + ':' + s.toString().padStart(2, '0');
+        }
+
+        function formatETA(seconds) {
+            if (seconds < 0 || !isFinite(seconds)) return 'Calculating...';
+            var mins = Math.floor(seconds / 60);
+            var secs = Math.floor(seconds % 60);
+            if (mins > 0) return mins + ' min ' + secs + ' sec';
+            return secs + ' seconds';
+        }
+
+        function updateTrimRegion() {
+            if (audioDuration <= 0) return;
+
+            var startPercent = (parseFloat(startTimeInput.value) / audioDuration) * 100;
+            var endPercent = (parseFloat(endTimeInput.value) / audioDuration) * 100;
+
+            startPercent = Math.max(0, Math.min(100, startPercent));
+            endPercent = Math.max(0, Math.min(100, endPercent));
+
+            trimRegion.style.left = startPercent + '%';
+            trimRegion.style.width = (endPercent - startPercent) + '%';
+
+            trimStartDisplay.textContent = formatTime(parseFloat(startTimeInput.value));
+            trimEndDisplay.textContent = formatTime(parseFloat(endTimeInput.value));
+
+            var duration = parseFloat(endTimeInput.value) - parseFloat(startTimeInput.value);
+            trimDurationDisplay.textContent = formatTime(Math.max(0, duration));
+        }
+
+        function updatePlayhead() {
+            if (audioDuration <= 0) return;
+            var percent = (audioPlayer.currentTime / audioDuration) * 100;
+            playhead.style.left = percent + '%';
+            currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
+        }
+
+        // ========================================
+        // Loader Functions
+        // ========================================
+
+        function showLoader() {
+            var trimDuration = parseFloat(endTimeInput.value) - parseFloat(startTimeInput.value);
+            estimatedTotalTime = Math.max(2, Math.ceil(trimDuration * 0.3) + 2);
+            currentProgress = 0;
+            startTime = Date.now();
+
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('indeterminate');
+            progressPercent.textContent = '0%';
+            progressStage.textContent = 'Initializing...';
+            loaderStatus.textContent = 'Preparing to trim...';
+            etaTime.textContent = formatETA(estimatedTotalTime);
+
+            loaderOverlay.classList.add('active');
+            isProcessing = true;
+
+            startProgressSimulation();
+        }
+
+        function hideLoader() {
+            isProcessing = false;
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            loaderOverlay.classList.remove('active');
+        }
+
+        function startProgressSimulation() {
+            if (progressInterval) clearInterval(progressInterval);
+
+            var stages = [
+                { percent: 15, stage: 'Reading audio...', status: 'Analyzing source file' },
+                { percent: 40, stage: 'Extracting segment...', status: 'Cutting audio at trim points' },
+                { percent: 70, stage: 'Processing...', status: 'Applying audio settings' },
+                { percent: 90, stage: 'Finalizing...', status: 'Preparing output file' }
+            ];
+
+            var currentStageIndex = 0;
+
+            progressInterval = setInterval(function () {
+                if (!isProcessing) {
+                    clearInterval(progressInterval);
+                    return;
+                }
+
+                var elapsedTime = (Date.now() - startTime) / 1000;
+                var timeBasedProgress = Math.min(95, (elapsedTime / estimatedTotalTime) * 100);
+
+                if (currentProgress < timeBasedProgress) {
+                    currentProgress = Math.min(currentProgress + 3, timeBasedProgress);
+                }
+
+                for (var i = stages.length - 1; i >= 0; i--) {
+                    if (currentProgress >= stages[i].percent) {
+                        if (currentStageIndex !== i) {
+                            currentStageIndex = i;
+                            progressStage.textContent = stages[i].stage;
+                            loaderStatus.textContent = stages[i].status;
+                        }
+                        break;
+                    }
+                }
+
+                progressBar.style.width = currentProgress + '%';
+                progressPercent.textContent = Math.floor(currentProgress) + '%';
+
+                var remainingTime = estimatedTotalTime - elapsedTime;
+                if (remainingTime < 0) {
+                    etaTime.textContent = 'Almost done...';
+                    if (!progressBar.classList.contains('indeterminate') && currentProgress >= 95) {
+                        progressBar.classList.add('indeterminate');
+                    }
+                } else {
+                    etaTime.textContent = formatETA(remainingTime);
+                }
+
+            }, 400);
+        }
+
+        function completeProgress() {
+            currentProgress = 100;
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('indeterminate');
+            progressPercent.textContent = '100%';
+            progressStage.textContent = 'Complete!';
+            loaderStatus.textContent = 'Trim successful!';
+            etaTime.textContent = 'Done!';
+
+            setTimeout(function () {
+                hideLoader();
+            }, 800);
+        }
+
+        // ========================================
+        // UI State Functions
+        // ========================================
+
+        function resetUIState() {
+            resultArea.style.display = 'none';
+            errorArea.style.display = 'none';
+            downloadLink.href = '#';
+        }
+
+        function setButtonLoading(loading) {
+            if (loading) {
+                convertBtn.classList.add('processing');
+                convertBtn.disabled = true;
+            } else {
+                convertBtn.classList.remove('processing');
+                convertBtn.disabled = false;
+            }
+        }
+
+        // ========================================
+        // Event Handlers
+        // ========================================
+
+        fileInput.onchange = function () {
+            resetUIState();
+            if (fileInput.files && fileInput.files.length > 0) {
+                var file = fileInput.files[0];
+                fileNameSpan.textContent = file.name;
+                uploadContent.style.display = 'none';
+                filePreview.style.display = 'flex';
+                clearBtn.style.display = 'block';
+
+                if (objectUrl) URL.revokeObjectURL(objectUrl);
+                objectUrl = URL.createObjectURL(file);
+                audioPlayer.src = objectUrl;
+                audioPlayer.style.display = 'block';
+                playerSection.style.display = 'block';
+                trimInfo.style.display = 'flex';
+            }
+        };
+
+        audioPlayer.onloadedmetadata = function () {
+            audioDuration = audioPlayer.duration;
+            totalDurationDisplay.textContent = formatTime(audioDuration);
+            endTimeInput.value = audioDuration.toFixed(1);
+            endTimeInput.max = audioDuration;
+            startTimeInput.max = audioDuration;
+            updateTrimRegion();
+        };
+
+        audioPlayer.ontimeupdate = updatePlayhead;
+
+        playBtn.onclick = function () {
+            if (audioPlayer.paused) {
+                audioPlayer.play();
+                playBtn.textContent = '⏸';
+            } else {
+                audioPlayer.pause();
+                playBtn.textContent = '▶';
+            }
+        };
+
+        audioPlayer.onplay = function () { playBtn.textContent = '⏸'; };
+        audioPlayer.onpause = function () { playBtn.textContent = '▶'; };
+
+        setStartBtn.onclick = function () {
+            startTimeInput.value = audioPlayer.currentTime.toFixed(1);
+            updateTrimRegion();
+        };
+
+        setEndBtn.onclick = function () {
+            endTimeInput.value = audioPlayer.currentTime.toFixed(1);
+            updateTrimRegion();
+        };
+
+        trimBar.onclick = function (e) {
+            var rect = trimBar.getBoundingClientRect();
+            var percent = (e.clientX - rect.left) / rect.width;
+            audioPlayer.currentTime = percent * audioDuration;
+        };
+
+        startTimeInput.oninput = updateTrimRegion;
+        endTimeInput.oninput = updateTrimRegion;
+
+        document.onkeydown = function (e) {
+            if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                playBtn.click();
+            }
+        };
+
+        clearBtn.onclick = function (e) {
+            e.preventDefault();
+            fileInput.value = '';
+            uploadContent.style.display = 'block';
+            filePreview.style.display = 'none';
+            clearBtn.style.display = 'none';
+            playerSection.style.display = 'none';
+            trimInfo.style.display = 'none';
+            audioPlayer.pause();
+            audioPlayer.src = '';
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            objectUrl = null;
+            resetUIState();
+        };
+
+        form.onsubmit = async function (e) {
+            e.preventDefault();
+
+            if (isProcessing) return;
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select an audio file');
+                return;
+            }
+
+            var startVal = parseFloat(startTimeInput.value);
+            var endVal = parseFloat(endTimeInput.value);
+
+            if (startVal >= endVal) {
+                alert('Start time must be less than end time');
+                return;
+            }
+
+            resetUIState();
+            var formData = new FormData(form);
+
+            setButtonLoading(true);
+            showLoader();
+
+            try {
+                var response = await fetch('/api/audio/trim/', { method: 'POST', body: formData });
+                var data = await response.json();
+
+                if (response.ok && data.download_url) {
+                    completeProgress();
+                    downloadLink.href = data.download_url;
+                    setTimeout(function () {
+                        resultArea.style.display = 'block';
+                    }, 900);
+                } else {
+                    hideLoader();
+                    errorMessage.textContent = data.error || 'Trimming failed';
+                    errorArea.style.display = 'block';
+                }
+            } catch (err) {
+                hideLoader();
+                errorMessage.textContent = 'Error: ' + err.message;
+                errorArea.style.display = 'block';
+            } finally {
+                setButtonLoading(false);
+            }
+        };
+
+        window.onbeforeunload = function (e) {
+            if (isProcessing) {
+                e.preventDefault();
+                e.returnValue = 'Audio trimming is in progress. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        };
+    })();
+</script>
+{% endblock %}

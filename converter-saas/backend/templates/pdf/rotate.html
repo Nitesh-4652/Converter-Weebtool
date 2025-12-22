@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Rotate PDF{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>🔄 Rotate PDF</h1>
+    <p>Rotate PDF pages to any angle</p>
+</section>
+
+<div class="converter-container">
+    <form id="rotate-form" class="converter-form" enctype="multipart/form-data">
+        <label class="upload-area" for="rotate-file-input">
+            <input type="file" id="rotate-file-input" name="file" accept=".pdf" style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">📄</div>
+                <p>Click to select PDF</p>
+            </div>
+            <div class="file-preview" id="file-preview" style="display:none;">
+                <div class="file-info">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name" id="file-name"></span>
+                </div>
+            </div>
+        </label>
+        <button type="button" id="clear-file" class="btn"
+            style="display:none; margin-bottom:1rem; background:#ef4444;">Clear</button>
+
+        <div class="form-group">
+            <label for="rotation">Rotation Angle</label>
+            <select id="rotation" name="rotation">
+                <option value="90">90° Clockwise</option>
+                <option value="180">180°</option>
+                <option value="270">90° Counter-clockwise</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn">
+            <span class="btn-text">Rotate PDF</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <div class="result-area" id="result-area" style="display:none;">
+        <div class="result-success">
+            <div class="result-icon">✅</div>
+            <h3>Rotation Complete!</h3>
+            <a href="#" id="download-link" class="btn btn-success" download>Download Rotated PDF</a>
+        </div>
+    </div>
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+
+<!-- Global Loader Overlay -->
+<div class="loader-overlay" id="loader-overlay">
+    <div class="loader-container">
+        <div class="loader-icon">🔄</div>
+        <h2 class="loader-title">Rotating PDF</h2>
+        <p class="loader-status" id="loader-status">Processing...</p>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-text">
+            <span id="progress-stage">Initializing...</span>
+            <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+
+        <div class="eta-display">
+            <div class="eta-label">Estimated Time Remaining</div>
+            <div class="eta-time" id="eta-time">Calculating...</div>
+        </div>
+
+        <div class="loader-warning">
+            <span class="loader-warning-icon">⚠️</span>
+            <span>Please do not refresh or close this page</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        var fileInput = document.getElementById('rotate-file-input');
+        var uploadContent = document.getElementById('upload-content');
+        var filePreview = document.getElementById('file-preview');
+        var fileNameSpan = document.getElementById('file-name');
+        var clearBtn = document.getElementById('clear-file');
+        var form = document.getElementById('rotate-form');
+        var convertBtn = document.getElementById('convert-btn');
+        var resultArea = document.getElementById('result-area');
+        var downloadLink = document.getElementById('download-link');
+        var errorArea = document.getElementById('error-area');
+        var errorMessage = document.getElementById('error-message');
+
+        var loaderOverlay = document.getElementById('loader-overlay');
+        var loaderStatus = document.getElementById('loader-status');
+        var progressBar = document.getElementById('progress-bar');
+        var progressStage = document.getElementById('progress-stage');
+        var progressPercent = document.getElementById('progress-percent');
+        var etaTime = document.getElementById('eta-time');
+
+        var isProcessing = false;
+        var progressInterval = null;
+
+        function formatSize(bytes) {
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function showLoader() {
+            loaderOverlay.classList.add('active');
+            isProcessing = true;
+            var currentProgress = 0;
+            var startTime = Date.now();
+            var estimatedTime = 3;
+
+            progressInterval = setInterval(function () {
+                if (!isProcessing) return;
+                var elapsed = (Date.now() - startTime) / 1000;
+                currentProgress = Math.min(95, (elapsed / estimatedTime) * 100);
+                progressBar.style.width = currentProgress + '%';
+                progressPercent.textContent = Math.floor(currentProgress) + '%';
+
+                if (currentProgress < 30) { progressStage.textContent = 'Reading PDF...'; loaderStatus.textContent = 'Loading document'; }
+                else if (currentProgress < 70) { progressStage.textContent = 'Rotating pages...'; loaderStatus.textContent = 'Applying rotation'; }
+                else { progressStage.textContent = 'Finalizing...'; loaderStatus.textContent = 'Saving file'; }
+
+                var remaining = Math.max(0, estimatedTime - elapsed);
+                etaTime.textContent = remaining < 1 ? 'Almost done...' : Math.ceil(remaining) + ' seconds';
+            }, 200);
+        }
+
+        function hideLoader() {
+            isProcessing = false;
+            if (progressInterval) clearInterval(progressInterval);
+            loaderOverlay.classList.remove('active');
+        }
+
+        function completeProgress() {
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressStage.textContent = 'Complete!';
+            etaTime.textContent = 'Done!';
+            setTimeout(hideLoader, 500);
+        }
+
+        function resetUIState() {
+            resultArea.style.display = 'none';
+            errorArea.style.display = 'none';
+            if (downloadLink.href && downloadLink.href.startsWith('blob:')) URL.revokeObjectURL(downloadLink.href);
+            downloadLink.href = '#';
+        }
+
+        fileInput.onchange = function () {
+            resetUIState();
+            if (fileInput.files && fileInput.files.length > 0) {
+                fileNameSpan.textContent = fileInput.files[0].name + ' (' + formatSize(fileInput.files[0].size) + ')';
+                uploadContent.style.display = 'none';
+                filePreview.style.display = 'flex';
+                clearBtn.style.display = 'block';
+            }
+        };
+
+        clearBtn.onclick = function (e) {
+            e.preventDefault();
+            fileInput.value = '';
+            uploadContent.style.display = 'block';
+            filePreview.style.display = 'none';
+            clearBtn.style.display = 'none';
+            resetUIState();
+        };
+
+        form.onsubmit = async function (e) {
+            e.preventDefault();
+            if (isProcessing) return;
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a PDF file');
+                return;
+            }
+
+            resetUIState();
+            convertBtn.classList.add('processing');
+            convertBtn.disabled = true;
+            showLoader();
+
+            try {
+                var response = await fetch('/api/pdf/rotate/', { method: 'POST', body: new FormData(form) });
+                if (response.ok) {
+                    var blob = await response.blob();
+                    completeProgress();
+                    downloadLink.href = URL.createObjectURL(blob);
+                    downloadLink.download = 'rotated.pdf';
+                    setTimeout(function () { resultArea.style.display = 'block'; }, 600);
+                } else {
+                    hideLoader();
+                    errorMessage.textContent = 'Rotation failed';
+                    errorArea.style.display = 'block';
+                }
+            } catch (err) {
+                hideLoader();
+                errorMessage.textContent = 'Error: ' + err.message;
+                errorArea.style.display = 'block';
+            } finally {
+                convertBtn.classList.remove('processing');
+                convertBtn.disabled = false;
+            }
+        };
+
+        window.onbeforeunload = function (e) {
+            if (isProcessing) { e.preventDefault(); e.returnValue = 'Processing...'; return e.returnValue; }
+        };
+    })();
+</script>
+{% endblock %}

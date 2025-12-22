@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+{% block title %}Video Converter{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>🎬 Video Converter</h1>
+    <p>Convert video files between 17+ formats - select multiple files at once</p>
+</section>
+
+<div class="converter-container">
+    <form id="video-form" class="converter-form" enctype="multipart/form-data">
+        <!-- Upload Area with Drag & Drop -->
+        <label class="upload-area" id="upload-area" for="video-file-input">
+            <input type="file" id="video-file-input" name="files" accept="video/*" multiple style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">🎬</div>
+                <p>Click to select or <span class="drop-zone-text">drag & drop</span></p>
+                <p class="upload-hint">Select multiple videos (Ctrl/Cmd + Click)</p>
+            </div>
+        </label>
+
+        <!-- File Queue -->
+        <div class="batch-queue" id="file-queue" style="display:none;">
+            <div class="batch-queue-header">
+                <div class="batch-queue-title">
+                    <span>📋 Files Queue</span>
+                    <span class="batch-queue-count" id="queue-count">0</span>
+                </div>
+                <button type="button" class="batch-queue-clear" id="clear-queue">Clear All</button>
+            </div>
+            <div class="batch-queue-list" id="queue-list"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="output_format">Output Format</label>
+            <select id="output_format" name="output_format" required>
+                <option value="mp4">MP4</option>
+                <option value="mkv">MKV</option>
+                <option value="avi">AVI</option>
+                <option value="mov">MOV</option>
+                <option value="webm">WebM</option>
+                <option value="flv">FLV</option>
+                <option value="wmv">WMV</option>
+                <option value="3gp">3GP</option>
+                <option value="m4v">M4V</option>
+                <option value="ogv">OGV</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="resolution">Resolution (optional)</label>
+            <select id="resolution" name="resolution">
+                <option value="">Original</option>
+                <option value="1920x1080">1080p (1920x1080)</option>
+                <option value="1280x720">720p (1280x720)</option>
+                <option value="854x480">480p (854x480)</option>
+                <option value="640x360">360p (640x360)</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn" disabled>
+            <span class="btn-text">Convert Videos</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <!-- Batch Results -->
+    <div class="batch-results" id="batch-results" style="display:none;">
+        <div class="batch-results-header">
+            <div class="batch-results-title">
+                <span>✅</span>
+                <span>Conversion Complete!</span>
+            </div>
+        </div>
+        <div class="batch-results-list" id="results-list"></div>
+    </div>
+
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+
+<!-- Global Loader Overlay -->
+<div class="loader-overlay" id="loader-overlay">
+    <div class="loader-container">
+        <div class="loader-icon">🎬</div>
+        <h2 class="loader-title">Converting Videos</h2>
+        <p class="loader-status" id="loader-status">Processing...</p>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-text">
+            <span id="progress-stage">Initializing...</span>
+            <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+
+        <div class="eta-display">
+            <div class="eta-label">Estimated Time</div>
+            <div class="eta-time" id="eta-time">Calculating...</div>
+        </div>
+
+        <div class="eta-display" style="margin-top: 0.5rem;">
+            <div class="eta-label">Files Progress</div>
+            <div class="eta-time" id="file-progress">0 / 0</div>
+        </div>
+
+        <div class="loader-warning">
+            <span class="loader-warning-icon">⚠️</span>
+            <span>Please do not refresh or close this page</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include shared multi-file processor -->
+<script src="/static/js/multi-file-processor.js"></script>
+
+<script>
+    (function () {
+        // ========================================
+        // Initialize Multi-File Processor
+        // ========================================
+
+        var processor = new MultiFileProcessor({
+            // DOM element IDs
+            uploadAreaId: 'upload-area',
+            fileInputId: 'video-file-input',
+            queueContainerId: 'file-queue',
+            resultsContainerId: 'batch-results',
+            convertBtnId: 'convert-btn',
+            clearBtnId: 'clear-queue',
+
+            // API endpoint
+            apiUrl: '/api/video/convert/',
+
+            // File configuration
+            accept: 'video/*',
+            multiple: true,
+            maxFiles: 20,
+            maxFileSize: 500 * 1024 * 1024, // 500MB per file
+
+            // Form data builder
+            getFormData: function (file) {
+                var data = {
+                    output_format: document.getElementById('output_format').value
+                };
+                var resolution = document.getElementById('resolution').value;
+                if (resolution) {
+                    data.resolution = resolution;
+                }
+                return data;
+            },
+
+            // Response handler
+            getDownloadUrl: function (response) {
+                return response.download_url;
+            },
+
+            // Output filename
+            getOutputFilename: function (file, response) {
+                var format = document.getElementById('output_format').value;
+                return file.name.replace(/\.[^/.]+$/, '') + '.' + format;
+            },
+
+            // History tracking
+            historyEnabled: true,
+            historyTool: 'Video Converter',
+            historyIcon: '🎬',
+
+            // Icons
+            fileIcon: '🎬'
+        });
+
+        // Initialize
+        processor.init();
+
+        // ========================================
+        // STAGED PROGRESS SYSTEM
+        // Fixes loader bar stuck at 0% for large files
+        // Shows continuous progress during conversion
+        // ========================================
+
+        var loaderOverlay = document.getElementById('loader-overlay');
+        var loaderStatus = document.getElementById('loader-status');
+        var progressBar = document.getElementById('progress-bar');
+        var progressStage = document.getElementById('progress-stage');
+        var progressPercent = document.getElementById('progress-percent');
+        var etaTime = document.getElementById('eta-time');
+        var fileProgress = document.getElementById('file-progress');
+        var errorArea = document.getElementById('error-area');
+
+        // Progress tracking state
+        var totalFiles = 0;
+        var currentFileIndex = 0;
+        var currentFileSize = 0;
+        var totalSize = 0;
+        var processedSize = 0;
+        var startTime = 0;
+        var fileStartTime = 0;
+
+        // Staged progress simulation
+        var progressInterval = null;
+        var simulatedProgress = 0;
+        var targetProgress = 0;
+
+        // Stage definitions (percentage ranges)
+        var STAGES = {
+            UPLOADING: { start: 0, end: 10, text: 'Uploading file...' },
+            ANALYZING: { start: 10, end: 20, text: 'Analyzing file...' },
+            CONVERTING: { start: 20, end: 90, text: 'Converting: ' },
+            FINALIZING: { start: 90, end: 100, text: 'Finalizing...' }
+        };
+
+        function formatETA(seconds) {
+            if (seconds < 0 || !isFinite(seconds)) return 'Calculating...';
+            if (seconds < 60) return Math.ceil(seconds) + 's remaining';
+            var mins = Math.floor(seconds / 60);
+            var secs = Math.ceil(seconds % 60);
+            return mins + 'm ' + secs + 's remaining';
+        }
+
+        function estimateTimeFromSize(bytes) {
+            // Estimate based on file size (rough: 1MB = ~3-5 seconds for video)
+            var mb = bytes / (1024 * 1024);
+            var estimatedSeconds = mb * 4; // 4 seconds per MB average
+            return Math.max(10, estimatedSeconds); // Minimum 10 seconds
+        }
+
+        function calculateOverallProgress(fileIndex, fileProgress) {
+            // Calculate overall progress based on file index and current file progress
+            if (totalFiles === 0) return 0;
+            var baseProgress = (fileIndex / totalFiles) * 100;
+            var fileContribution = (fileProgress / 100) * (100 / totalFiles);
+            return Math.min(99, baseProgress + fileContribution);
+        }
+
+        function startProgressSimulation(fileSize, filename) {
+            // Clear any existing interval
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+
+            fileStartTime = Date.now();
+            currentFileSize = fileSize;
+            simulatedProgress = STAGES.UPLOADING.start;
+
+            // Estimate total time for this file
+            var estimatedTime = estimateTimeFromSize(fileSize);
+            var estimatedEndTime = Date.now() + (estimatedTime * 1000);
+
+            // Update ETA immediately with estimate
+            etaTime.textContent = formatETA(estimatedTime);
+
+            // Simulate progress stages
+            progressInterval = setInterval(function () {
+                var elapsed = (Date.now() - fileStartTime) / 1000;
+                var estimatedTotal = estimateTimeFromSize(currentFileSize);
+                var progressRatio = Math.min(0.95, elapsed / estimatedTotal);
+
+                // Map progress ratio to stage-based progress (0-95%)
+                if (progressRatio < 0.05) {
+                    // Uploading stage (0-10%)
+                    simulatedProgress = STAGES.UPLOADING.start + (progressRatio / 0.05) * (STAGES.UPLOADING.end - STAGES.UPLOADING.start);
+                    progressStage.textContent = STAGES.UPLOADING.text;
+                } else if (progressRatio < 0.1) {
+                    // Analyzing stage (10-20%)
+                    var stageRatio = (progressRatio - 0.05) / 0.05;
+                    simulatedProgress = STAGES.ANALYZING.start + stageRatio * (STAGES.ANALYZING.end - STAGES.ANALYZING.start);
+                    progressStage.textContent = STAGES.ANALYZING.text;
+                } else if (progressRatio < 0.9) {
+                    // Converting stage (20-90%)
+                    var stageRatio = (progressRatio - 0.1) / 0.8;
+                    simulatedProgress = STAGES.CONVERTING.start + stageRatio * (STAGES.CONVERTING.end - STAGES.CONVERTING.start);
+                    progressStage.textContent = STAGES.CONVERTING.text + filename;
+                } else {
+                    // Finalizing stage (90-95% - actual 100% comes from completion)
+                    var stageRatio = (progressRatio - 0.9) / 0.05;
+                    simulatedProgress = STAGES.FINALIZING.start + stageRatio * 5; // Max 95%
+                    progressStage.textContent = STAGES.FINALIZING.text;
+                }
+
+                // Calculate overall progress including previous files
+                var overallProgress = calculateOverallProgress(currentFileIndex, simulatedProgress);
+                progressBar.style.width = overallProgress + '%';
+                progressPercent.textContent = Math.round(overallProgress) + '%';
+
+                // Update ETA
+                var remainingTime = estimatedTotal - elapsed;
+                if (remainingTime > 0) {
+                    // Add time for remaining files
+                    var remainingFilesSize = totalSize - processedSize - currentFileSize;
+                    var remainingFilesTime = estimateTimeFromSize(remainingFilesSize);
+                    etaTime.textContent = formatETA(remainingTime + remainingFilesTime);
+                }
+
+            }, 200); // Update every 200ms for smooth animation
+        }
+
+        function stopProgressSimulation() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+
+        function showLoader(queue) {
+            loaderOverlay.classList.add('active');
+            progressBar.style.width = '5%'; // Start at 5% immediately
+            progressPercent.textContent = '5%';
+            progressStage.textContent = 'Starting...';
+            loaderStatus.textContent = 'Processing videos...';
+
+            totalFiles = queue.length;
+            currentFileIndex = 0;
+            totalSize = queue.reduce(function (sum, item) { return sum + item.file.size; }, 0);
+            processedSize = 0;
+            startTime = Date.now();
+
+            // Calculate initial ETA estimate
+            var totalEstimate = estimateTimeFromSize(totalSize);
+            etaTime.textContent = '~' + formatETA(totalEstimate);
+            fileProgress.textContent = '0 / ' + queue.length;
+        }
+
+        function updateLoaderFileStart(index, total, filename, fileSize) {
+            currentFileIndex = index;
+            fileProgress.textContent = (index + 1) + ' / ' + total;
+            loaderStatus.textContent = 'Processing file ' + (index + 1) + ' of ' + total;
+
+            // Start simulated progress for this file
+            startProgressSimulation(fileSize, filename);
+        }
+
+        function onFileComplete(fileSize) {
+            stopProgressSimulation();
+            processedSize += fileSize;
+
+            // Show 100% for this file's contribution
+            var overallProgress = calculateOverallProgress(currentFileIndex + 1, 0);
+            progressBar.style.width = overallProgress + '%';
+            progressPercent.textContent = Math.round(overallProgress) + '%';
+        }
+
+        function hideLoader() {
+            stopProgressSimulation();
+            loaderOverlay.classList.remove('active');
+        }
+
+        function completeLoader(total) {
+            stopProgressSimulation();
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressStage.textContent = 'Complete!';
+            loaderStatus.textContent = 'All videos converted!';
+            etaTime.textContent = 'Done!';
+            fileProgress.textContent = total + ' / ' + total;
+
+            setTimeout(hideLoader, 800);
+        }
+
+        // ========================================
+        // Event Callbacks
+        // ========================================
+
+        processor.options.onProcessStart = function (queue) {
+            errorArea.style.display = 'none';
+            showLoader(queue);
+        };
+
+        processor.options.onFileProcessing = function (item, index, queue) {
+            // Start staged progress simulation for this file
+            updateLoaderFileStart(index, queue.length, item.file.name, item.file.size);
+        };
+
+        processor.options.onFileComplete = function (item, index, queue) {
+            onFileComplete(item.file.size);
+        };
+
+        processor.options.onAllComplete = function (results, queue) {
+            completeLoader(queue.length);
+        };
+
+        processor.options.onFileError = function (item, error, index, queue) {
+            console.error('Error converting ' + item.file.name + ':', error);
+        };
+
+        // ========================================
+        // Form Submit Handler
+        // ========================================
+
+        var form = document.getElementById('video-form');
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            if (processor.getFileCount() === 0) {
+                alert('Please select at least one video');
+                return;
+            }
+
+            if (processor.getIsProcessing()) {
+                return;
+            }
+
+            processor.startProcessing();
+        });
+
+        // ========================================
+        // Prevent Navigation During Processing
+        // ========================================
+
+        window.addEventListener('beforeunload', function (e) {
+            if (processor.getIsProcessing()) {
+                e.preventDefault();
+                e.returnValue = 'Videos are still being processed. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+
+    })();
+</script>
+{% endblock %}

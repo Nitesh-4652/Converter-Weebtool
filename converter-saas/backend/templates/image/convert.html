@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% block title %}Image Converter{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>🖼️ Image Converter</h1>
+    <p>Convert images between 17+ formats - select multiple files at once</p>
+</section>
+
+<div class="converter-container">
+    <form id="image-form" class="converter-form" enctype="multipart/form-data">
+        <!-- Upload Area with Drag & Drop -->
+        <label class="upload-area" id="upload-area" for="image-file-input">
+            <input type="file" id="image-file-input" name="files" accept="image/*" multiple style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">🖼️</div>
+                <p>Click to select or <span class="drop-zone-text">drag & drop</span></p>
+                <p class="upload-hint">Select multiple images (Ctrl/Cmd + Click)</p>
+            </div>
+        </label>
+
+        <!-- File Queue -->
+        <div class="batch-queue" id="file-queue" style="display:none;">
+            <div class="batch-queue-header">
+                <div class="batch-queue-title">
+                    <span>📋 Files Queue</span>
+                    <span class="batch-queue-count" id="queue-count">0</span>
+                </div>
+                <button type="button" class="batch-queue-clear" id="clear-queue">Clear All</button>
+            </div>
+            <div class="batch-queue-list" id="queue-list"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="output_format">Output Format</label>
+            <select id="output_format" name="output_format" required>
+                <option value="png">PNG</option>
+                <option value="jpg">JPEG</option>
+                <option value="webp">WebP</option>
+                <option value="gif">GIF</option>
+                <option value="bmp">BMP</option>
+                <option value="tiff">TIFF</option>
+                <option value="ico">ICO</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="quality">Quality</label>
+            <select id="quality" name="quality">
+                <option value="95">95% (Best)</option>
+                <option value="85" selected>85% (High)</option>
+                <option value="75">75% (Medium)</option>
+                <option value="60">60% (Low)</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn" disabled>
+            <span class="btn-text">Convert Images</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <!-- Batch Results -->
+    <div class="batch-results" id="batch-results" style="display:none;">
+        <div class="batch-results-header">
+            <div class="batch-results-title">
+                <span>✅</span>
+                <span>Conversion Complete!</span>
+            </div>
+        </div>
+        <div class="batch-results-list" id="results-list"></div>
+    </div>
+
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+
+<!-- Global Loader Overlay (for single large file) -->
+<div class="loader-overlay" id="loader-overlay">
+    <div class="loader-container">
+        <div class="loader-icon">🖼️</div>
+        <h2 class="loader-title">Converting Images</h2>
+        <p class="loader-status" id="loader-status">Processing...</p>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-text">
+            <span id="progress-stage">Initializing...</span>
+            <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+
+        <div class="eta-display">
+            <div class="eta-label">Estimated Time</div>
+            <div class="eta-time" id="eta-time">Calculating...</div>
+        </div>
+
+        <div class="eta-display" style="margin-top: 0.5rem;">
+            <div class="eta-label">Files Progress</div>
+            <div class="eta-time" id="file-progress">0 / 0</div>
+        </div>
+
+        <div class="loader-warning">
+            <span class="loader-warning-icon">⚠️</span>
+            <span>Please do not refresh or close this page</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include shared multi-file processor -->
+<script src="/static/js/multi-file-processor.js"></script>
+
+<script>
+    (function () {
+        // ========================================
+        // Initialize Multi-File Processor
+        // ========================================
+
+        var processor = new MultiFileProcessor({
+            // DOM element IDs
+            uploadAreaId: 'upload-area',
+            fileInputId: 'image-file-input',
+            queueContainerId: 'file-queue',
+            resultsContainerId: 'batch-results',
+            convertBtnId: 'convert-btn',
+            clearBtnId: 'clear-queue',
+
+            // API endpoint
+            apiUrl: '/api/image/convert/',
+
+            // File configuration
+            accept: 'image/*',
+            multiple: true,
+            maxFiles: 50,
+            maxFileSize: 50 * 1024 * 1024, // 50MB per file
+
+            // Form data builder
+            getFormData: function (file) {
+                return {
+                    output_format: document.getElementById('output_format').value,
+                    quality: document.getElementById('quality').value
+                };
+            },
+
+            // Response handler
+            getDownloadUrl: function (response) {
+                return response.download_url;
+            },
+
+            // Output filename
+            getOutputFilename: function (file, response) {
+                var format = document.getElementById('output_format').value;
+                return file.name.replace(/\.[^/.]+$/, '') + '.' + format;
+            },
+
+            // History tracking
+            historyEnabled: true,
+            historyTool: 'Image Converter',
+            historyIcon: '🖼️',
+
+            // Icons
+            fileIcon: '🖼️'
+        });
+
+        // Initialize
+        processor.init();
+
+        // ========================================
+        // STAGED PROGRESS SYSTEM
+        // Fixes loader bar stuck at 0% for large files
+        // Shows continuous progress during conversion
+        // ========================================
+
+        var loaderOverlay = document.getElementById('loader-overlay');
+        var loaderStatus = document.getElementById('loader-status');
+        var progressBar = document.getElementById('progress-bar');
+        var progressStage = document.getElementById('progress-stage');
+        var progressPercent = document.getElementById('progress-percent');
+        var etaTime = document.getElementById('eta-time');
+        var fileProgress = document.getElementById('file-progress');
+        var errorArea = document.getElementById('error-area');
+        var errorMessage = document.getElementById('error-message');
+
+        // Progress tracking state
+        var totalFiles = 0;
+        var currentFileIndex = 0;
+        var currentFileSize = 0;
+        var totalSize = 0;
+        var processedSize = 0;
+        var startTime = 0;
+        var fileStartTime = 0;
+
+        // Staged progress simulation
+        var progressInterval = null;
+        var simulatedProgress = 0;
+
+        // Stage definitions
+        var STAGES = {
+            UPLOADING: { start: 0, end: 15, text: 'Uploading...' },
+            PROCESSING: { start: 15, end: 85, text: 'Converting: ' },
+            FINALIZING: { start: 85, end: 100, text: 'Finalizing...' }
+        };
+
+        function formatETA(seconds) {
+            if (seconds < 0 || !isFinite(seconds)) return 'Calculating...';
+            if (seconds < 60) return Math.ceil(seconds) + 's remaining';
+            var mins = Math.floor(seconds / 60);
+            var secs = Math.ceil(seconds % 60);
+            return mins + 'm ' + secs + 's remaining';
+        }
+
+        function estimateTimeFromSize(bytes) {
+            // Images are faster - ~0.5 second per MB
+            var mb = bytes / (1024 * 1024);
+            var estimatedSeconds = mb * 0.5;
+            return Math.max(2, estimatedSeconds); // Minimum 2 seconds
+        }
+
+        function calculateOverallProgress(fileIndex, fileProgress) {
+            if (totalFiles === 0) return 0;
+            var baseProgress = (fileIndex / totalFiles) * 100;
+            var fileContribution = (fileProgress / 100) * (100 / totalFiles);
+            return Math.min(99, baseProgress + fileContribution);
+        }
+
+        function startProgressSimulation(fileSize, filename) {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+
+            fileStartTime = Date.now();
+            currentFileSize = fileSize;
+            simulatedProgress = STAGES.UPLOADING.start;
+
+            var estimatedTime = estimateTimeFromSize(fileSize);
+            etaTime.textContent = formatETA(estimatedTime);
+
+            progressInterval = setInterval(function () {
+                var elapsed = (Date.now() - fileStartTime) / 1000;
+                var estimatedTotal = estimateTimeFromSize(currentFileSize);
+                var progressRatio = Math.min(0.95, elapsed / estimatedTotal);
+
+                if (progressRatio < 0.1) {
+                    simulatedProgress = STAGES.UPLOADING.start + (progressRatio / 0.1) * (STAGES.UPLOADING.end - STAGES.UPLOADING.start);
+                    progressStage.textContent = STAGES.UPLOADING.text;
+                } else if (progressRatio < 0.85) {
+                    var stageRatio = (progressRatio - 0.1) / 0.75;
+                    simulatedProgress = STAGES.PROCESSING.start + stageRatio * (STAGES.PROCESSING.end - STAGES.PROCESSING.start);
+                    progressStage.textContent = STAGES.PROCESSING.text + filename;
+                } else {
+                    var stageRatio = (progressRatio - 0.85) / 0.1;
+                    simulatedProgress = STAGES.FINALIZING.start + stageRatio * 10;
+                    progressStage.textContent = STAGES.FINALIZING.text;
+                }
+
+                var overallProgress = calculateOverallProgress(currentFileIndex, simulatedProgress);
+                progressBar.style.width = overallProgress + '%';
+                progressPercent.textContent = Math.round(overallProgress) + '%';
+
+                var remainingTime = estimatedTotal - elapsed;
+                if (remainingTime > 0) {
+                    var remainingFilesSize = totalSize - processedSize - currentFileSize;
+                    var remainingFilesTime = estimateTimeFromSize(remainingFilesSize);
+                    etaTime.textContent = formatETA(remainingTime + remainingFilesTime);
+                }
+            }, 100);
+        }
+
+        function stopProgressSimulation() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+
+        function showLoader(queue) {
+            loaderOverlay.classList.add('active');
+            progressBar.style.width = '5%';
+            progressPercent.textContent = '5%';
+            progressStage.textContent = 'Starting...';
+            loaderStatus.textContent = 'Processing images...';
+
+            totalFiles = queue.length;
+            currentFileIndex = 0;
+            totalSize = queue.reduce(function (sum, item) { return sum + item.file.size; }, 0);
+            processedSize = 0;
+            startTime = Date.now();
+
+            var totalEstimate = estimateTimeFromSize(totalSize);
+            etaTime.textContent = '~' + formatETA(totalEstimate);
+            fileProgress.textContent = '0 / ' + queue.length;
+        }
+
+        function updateLoaderFileStart(index, total, filename, fileSize) {
+            currentFileIndex = index;
+            fileProgress.textContent = (index + 1) + ' / ' + total;
+            loaderStatus.textContent = 'Processing file ' + (index + 1) + ' of ' + total;
+            startProgressSimulation(fileSize, filename);
+        }
+
+        function onFileComplete(fileSize) {
+            stopProgressSimulation();
+            processedSize += fileSize;
+
+            var overallProgress = calculateOverallProgress(currentFileIndex + 1, 0);
+            progressBar.style.width = overallProgress + '%';
+            progressPercent.textContent = Math.round(overallProgress) + '%';
+        }
+
+        function hideLoader() {
+            stopProgressSimulation();
+            loaderOverlay.classList.remove('active');
+        }
+
+        function completeLoader(total) {
+            stopProgressSimulation();
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressStage.textContent = 'Complete!';
+            loaderStatus.textContent = 'All images converted!';
+            etaTime.textContent = 'Done!';
+            fileProgress.textContent = total + ' / ' + total;
+
+            setTimeout(hideLoader, 800);
+        }
+
+        // ========================================
+        // Event Callbacks
+        // ========================================
+
+        processor.options.onProcessStart = function (queue) {
+            errorArea.style.display = 'none';
+            showLoader(queue);
+        };
+
+        processor.options.onFileProcessing = function (item, index, queue) {
+            updateLoaderFileStart(index, queue.length, item.file.name, item.file.size);
+        };
+
+        processor.options.onFileComplete = function (item, index, queue) {
+            onFileComplete(item.file.size);
+        };
+
+        processor.options.onAllComplete = function (results, queue) {
+            completeLoader(queue.length);
+        };
+
+        processor.options.onFileError = function (item, error, index, queue) {
+            console.error('Error converting ' + item.file.name + ':', error);
+        };
+
+        // ========================================
+        // Form Submit Handler
+        // ========================================
+
+        var form = document.getElementById('image-form');
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            if (processor.getFileCount() === 0) {
+                alert('Please select at least one image');
+                return;
+            }
+
+            if (processor.getIsProcessing()) {
+                return;
+            }
+
+            processor.startProcessing();
+        });
+
+        // ========================================
+        // Prevent Navigation During Processing
+        // ========================================
+
+        window.addEventListener('beforeunload', function (e) {
+            if (processor.getIsProcessing()) {
+                e.preventDefault();
+                e.returnValue = 'Images are still being processed. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        });
+
+    })();
+</script>
+{% endblock %}

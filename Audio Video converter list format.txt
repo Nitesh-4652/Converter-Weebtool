@@ -1,0 +1,100 @@
+🎵 Audio Formats – Importance & Description (One-Line Each)
+
+MP3 (.mp3) – ⭐⭐⭐⭐⭐ Most used
+Lossy compressed audio with small size, supported everywhere.
+
+WAV (.wav) – ⭐⭐⭐⭐⭐ Professional quality
+Uncompressed raw audio with maximum quality and large size.
+
+AAC (.aac) – ⭐⭐⭐⭐ Modern standard
+Better sound than MP3 at the same bitrate, widely used in streaming.
+
+M4A (.m4a) – ⭐⭐⭐⭐ Apple ecosystem
+AAC audio inside MP4 container, common on iPhone & YouTube audio.
+
+FLAC (.flac) – ⭐⭐⭐⭐ High-quality lossless
+Lossless compression preserving original quality with smaller size than WAV.
+
+OGG (.ogg) – ⭐⭐⭐ Open-source alternative
+Free codec with good compression, used in games and browsers.
+
+Opus (.opus) – ⭐⭐⭐⭐ Best for streaming & voice
+Modern codec optimized for low bandwidth with excellent quality.
+
+AIFF (.aiff) – ⭐⭐⭐ Studio & Apple
+Apple’s uncompressed professional audio format similar to WAV.
+
+ALAC (.m4a) – ⭐⭐⭐ Apple lossless
+Apple Lossless format preserving full quality with compression.
+
+WMA (.wma) – ⭐⭐ Microsoft legacy
+Windows Media Audio format, less popular today.
+
+AMR (.amr) – ⭐⭐ Mobile voice
+Optimized for speech recordings and phone calls.
+
+AC3 (.ac3) – ⭐⭐⭐ Cinema & surround
+Dolby Digital format used in movies and surround sound.
+
+PCM (.pcm) – ⭐⭐ Raw audio data
+Uncompressed digital audio without headers or metadata.
+
+APE (.ape) – ⭐⭐ Lossless niche
+Monkey’s Audio lossless format with limited support.
+
+CAF (.caf) – ⭐⭐ Apple recording
+Flexible container used in Apple audio recording systems.
+
+|-----------------------------------------------------------------------------------------------------------------------------------|
+
+🎬 Video Formats – Importance & One-Line Description
+
+MP4 (.mp4) – ⭐⭐⭐⭐⭐ Most important
+Universal video format with high quality and excellent compression.
+
+MKV (.mkv) – ⭐⭐⭐⭐⭐ Feature-rich container
+Supports multiple audio, subtitles, and high-quality video tracks.
+
+AVI (.avi) – ⭐⭐⭐ Legacy standard
+Older Microsoft format with good quality but large file size.
+
+MOV (.mov) – ⭐⭐⭐⭐ Apple & professional
+High-quality video format used in Apple and video editing software.
+
+WEBM (.webm) – ⭐⭐⭐⭐ Web & streaming
+Open-source format optimized for web playback (YouTube, browsers).
+
+FLV (.flv) – ⭐⭐⭐ Old streaming
+Flash video format once used for online streaming.
+
+WMV (.wmv) – ⭐⭐ Windows legacy
+Microsoft format mainly for Windows systems.
+
+3GP (.3gp) – ⭐⭐ Mobile video
+Lightweight format designed for older mobile phones.
+
+MPEG / MPG (.mpg, .mpeg) – ⭐⭐⭐ DVD & broadcast
+Early standard used in DVDs and TV broadcasting.
+
+TS (.ts) – ⭐⭐⭐ Streaming transport
+Transport stream format used in live streaming and broadcasts.
+
+M4V (.m4v) – ⭐⭐⭐ Apple MP4 variant
+Apple’s version of MP4 with DRM support.
+
+OGV (.ogv) – ⭐⭐ Open-source web
+Ogg video format used in open web environments.
+
+F4V (.f4v) – ⭐⭐ Flash MP4
+Flash-based MP4 container used in older platforms.
+
+VOB (.vob) – ⭐⭐⭐ DVD video
+DVD container format including video, audio, and subtitles.
+
+RM / RMVB (.rm, .rmvb) – ⭐ Legacy streaming
+RealMedia format used in early internet video.
+
+|---------------------------------------------------------------------------------------------------------------|
+
+Video --> audio
+audio --> video

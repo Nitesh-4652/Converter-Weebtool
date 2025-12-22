@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-header">
+    <h1>📄 PDF Tools</h1>
+    <p>Convert, merge, split, and edit PDF files</p>
+</section>
+<section class="tools-grid">
+    {% for tool in tools %}
+    <a href="{{ tool.url }}" class="tool-card">
+        <div class="tool-icon">{{ tool.icon }}</div>
+        <h3 class="tool-name">{{ tool.name }}</h3>
+        <p class="tool-description">{{ tool.description }}</p>
+    </a>
+    {% endfor %}
+</section>
+{% endblock %}

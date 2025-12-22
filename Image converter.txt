@@ -1,0 +1,47 @@
+🖼️ Image Formats – Importance & One-Line Description
+
+JPEG / JPG (.jpg) – ⭐⭐⭐⭐⭐ Most important
+Lossy compressed image format best for photos with small file size.
+
+PNG (.png) – ⭐⭐⭐⭐⭐ Transparency support
+Lossless image format supporting transparency and sharp graphics.
+
+WebP (.webp) – ⭐⭐⭐⭐⭐ Modern web standard
+Highly compressed format with better quality and smaller size than JPG/PNG.
+
+GIF (.gif) – ⭐⭐⭐ Animation support
+Limited-color format mainly used for simple animations.
+
+SVG (.svg) – ⭐⭐⭐⭐⭐ Scalable graphics
+Vector-based format that scales without losing quality.
+
+BMP (.bmp) – ⭐⭐ Raw image
+Uncompressed bitmap format with very large file size.
+
+TIFF (.tiff) – ⭐⭐⭐⭐ Professional printing
+High-quality format used in scanning, printing, and publishing.
+
+ICO (.ico) – ⭐⭐ Icons
+Image format used for application and website icons.
+
+HEIF / HEIC (.heic) – ⭐⭐⭐⭐ Apple & mobile
+High-efficiency image format used by iPhones with smaller size.
+
+RAW (.raw, .nef, .cr2) – ⭐⭐⭐⭐ Camera original
+Unprocessed camera image containing maximum image data.
+
+PSD (.psd) – ⭐⭐⭐ Photoshop projects
+Adobe Photoshop file storing layers and editing data.
+
+AI (.ai) – ⭐⭐⭐ Vector design
+Adobe Illustrator vector image format.
+
+EPS (.eps) – ⭐⭐⭐ Print & vector
+Vector-based format used in professional printing.
+
+AVIF (.avif) – ⭐⭐⭐⭐ Next-gen web
+Modern image format with excellent compression and quality.
+
+PPM / PGM (.ppm, .pgm) – ⭐ Low-level usage
+Simple image formats used mainly for image processing experiments.
+

@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Split PDF{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>✂️ Split PDF</h1>
+    <p>Extract specific pages from PDF</p>
+</section>
+
+<div class="converter-container">
+    <form id="split-form" class="converter-form" enctype="multipart/form-data">
+        <label class="upload-area" for="split-file-input">
+            <input type="file" id="split-file-input" name="file" accept=".pdf" style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">📄</div>
+                <p>Click to select PDF</p>
+            </div>
+            <div class="file-preview" id="file-preview" style="display:none;">
+                <div class="file-info">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name" id="file-name"></span>
+                </div>
+            </div>
+        </label>
+        <button type="button" id="clear-file" class="btn"
+            style="display:none; margin-bottom:1rem; background:#ef4444;">Clear</button>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="start_page">Start Page</label>
+                <input type="number" id="start_page" name="start_page" min="1" value="1" required>
+            </div>
+            <div class="form-group">
+                <label for="end_page">End Page</label>
+                <input type="number" id="end_page" name="end_page" min="1" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn">
+            <span class="btn-text">Split PDF</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <div class="result-area" id="result-area" style="display:none;">
+        <div class="result-success">
+            <div class="result-icon">✅</div>
+            <h3>Split Complete!</h3>
+            <a href="#" id="download-link" class="btn btn-success" download>Download Split PDF</a>
+        </div>
+    </div>
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+
+<!-- Global Loader Overlay -->
+<div class="loader-overlay" id="loader-overlay">
+    <div class="loader-container">
+        <div class="loader-icon">✂️</div>
+        <h2 class="loader-title">Splitting PDF</h2>
+        <p class="loader-status" id="loader-status">Processing...</p>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-text">
+            <span id="progress-stage">Initializing...</span>
+            <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+
+        <div class="eta-display">
+            <div class="eta-label">Estimated Time Remaining</div>
+            <div class="eta-time" id="eta-time">Calculating...</div>
+        </div>
+
+        <div class="loader-warning">
+            <span class="loader-warning-icon">⚠️</span>
+            <span>Please do not refresh or close this page</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        var fileInput = document.getElementById('split-file-input');
+        var uploadContent = document.getElementById('upload-content');
+        var filePreview = document.getElementById('file-preview');
+        var fileNameSpan = document.getElementById('file-name');
+        var clearBtn = document.getElementById('clear-file');
+        var form = document.getElementById('split-form');
+        var convertBtn = document.getElementById('convert-btn');
+        var resultArea = document.getElementById('result-area');
+        var downloadLink = document.getElementById('download-link');
+        var errorArea = document.getElementById('error-area');
+        var errorMessage = document.getElementById('error-message');
+
+        var loaderOverlay = document.getElementById('loader-overlay');
+        var loaderStatus = document.getElementById('loader-status');
+        var progressBar = document.getElementById('progress-bar');
+        var progressStage = document.getElementById('progress-stage');
+        var progressPercent = document.getElementById('progress-percent');
+        var etaTime = document.getElementById('eta-time');
+
+        var isProcessing = false;
+        var progressInterval = null;
+        var currentProgress = 0;
+        var estimatedTotalTime = 0;
+        var startTime = 0;
+
+        function formatSize(bytes) {
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function formatETA(seconds) {
+            if (seconds < 0 || !isFinite(seconds)) return 'Calculating...';
+            var secs = Math.floor(seconds);
+            return secs <= 0 ? 'Almost done...' : secs + ' seconds';
+        }
+
+        function showLoader(fileSizeBytes) {
+            estimatedTotalTime = Math.max(2, Math.ceil(fileSizeBytes / (1024 * 1024)) + 1);
+            currentProgress = 0;
+            startTime = Date.now();
+
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressStage.textContent = 'Initializing...';
+            loaderStatus.textContent = 'Reading PDF...';
+            etaTime.textContent = formatETA(estimatedTotalTime);
+
+            loaderOverlay.classList.add('active');
+            isProcessing = true;
+
+            var stages = [
+                { percent: 25, stage: 'Reading PDF...', status: 'Analyzing document' },
+                { percent: 60, stage: 'Extracting pages...', status: 'Splitting selected range' },
+                { percent: 90, stage: 'Finalizing...', status: 'Creating output file' }
+            ];
+            var currentStageIndex = 0;
+
+            progressInterval = setInterval(function () {
+                if (!isProcessing) return;
+                var elapsedTime = (Date.now() - startTime) / 1000;
+                var timeBasedProgress = Math.min(95, (elapsedTime / estimatedTotalTime) * 100);
+                if (currentProgress < timeBasedProgress) currentProgress = Math.min(currentProgress + 4, timeBasedProgress);
+
+                for (var i = stages.length - 1; i >= 0; i--) {
+                    if (currentProgress >= stages[i].percent && currentStageIndex !== i) {
+                        currentStageIndex = i;
+                        progressStage.textContent = stages[i].stage;
+                        loaderStatus.textContent = stages[i].status;
+                        break;
+                    }
+                }
+
+                progressBar.style.width = currentProgress + '%';
+                progressPercent.textContent = Math.floor(currentProgress) + '%';
+                etaTime.textContent = formatETA(estimatedTotalTime - elapsedTime);
+            }, 300);
+        }
+
+        function hideLoader() {
+            isProcessing = false;
+            if (progressInterval) clearInterval(progressInterval);
+            loaderOverlay.classList.remove('active');
+        }
+
+        function completeProgress() {
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressStage.textContent = 'Complete!';
+            etaTime.textContent = 'Done!';
+            setTimeout(hideLoader, 600);
+        }
+
+        function resetUIState() {
+            resultArea.style.display = 'none';
+            errorArea.style.display = 'none';
+            if (downloadLink.href && downloadLink.href.startsWith('blob:')) URL.revokeObjectURL(downloadLink.href);
+            downloadLink.href = '#';
+        }
+
+        function setButtonLoading(loading) {
+            convertBtn.classList.toggle('processing', loading);
+            convertBtn.disabled = loading;
+        }
+
+        fileInput.onchange = function () {
+            resetUIState();
+            if (fileInput.files && fileInput.files.length > 0) {
+                fileNameSpan.textContent = fileInput.files[0].name + ' (' + formatSize(fileInput.files[0].size) + ')';
+                uploadContent.style.display = 'none';
+                filePreview.style.display = 'flex';
+                clearBtn.style.display = 'block';
+            }
+        };
+
+        clearBtn.onclick = function (e) {
+            e.preventDefault();
+            fileInput.value = '';
+            uploadContent.style.display = 'block';
+            filePreview.style.display = 'none';
+            clearBtn.style.display = 'none';
+            resetUIState();
+        };
+
+        form.onsubmit = async function (e) {
+            e.preventDefault();
+            if (isProcessing) return;
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a PDF file');
+                return;
+            }
+
+            var startPage = parseInt(document.getElementById('start_page').value);
+            var endPage = parseInt(document.getElementById('end_page').value);
+            if (startPage > endPage) {
+                alert('Start page must be less than or equal to end page');
+                return;
+            }
+
+            resetUIState();
+            var formData = new FormData(form);
+
+            setButtonLoading(true);
+            showLoader(fileInput.files[0].size);
+
+            try {
+                var response = await fetch('/api/pdf/split/', { method: 'POST', body: formData });
+                if (response.ok) {
+                    var blob = await response.blob();
+                    completeProgress();
+                    downloadLink.href = URL.createObjectURL(blob);
+                    downloadLink.download = 'split.pdf';
+                    setTimeout(function () { resultArea.style.display = 'block'; }, 700);
+                } else {
+                    hideLoader();
+                    errorMessage.textContent = 'Split failed';
+                    errorArea.style.display = 'block';
+                }
+            } catch (err) {
+                hideLoader();
+                errorMessage.textContent = 'Error: ' + err.message;
+                errorArea.style.display = 'block';
+            } finally {
+                setButtonLoading(false);
+            }
+        };
+
+        window.onbeforeunload = function (e) {
+            if (isProcessing) {
+                e.preventDefault();
+                e.returnValue = 'PDF split is in progress.';
+                return e.returnValue;
+            }
+        };
+    })();
+</script>
+{% endblock %}

@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}Images to PDF{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>🖼️ Images to PDF</h1>
+    <p>Convert multiple images into a single PDF document</p>
+</section>
+
+<div class="converter-container">
+    <form id="img2pdf-form" class="converter-form" enctype="multipart/form-data">
+        <label class="upload-area" for="images-file-input">
+            <input type="file" id="images-file-input" name="files" accept="image/*" multiple style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">🖼️</div>
+                <p>Click to select images</p>
+                <p class="upload-hint">Select multiple images (hold Ctrl/Cmd)</p>
+            </div>
+            <div class="file-preview" id="file-preview" style="display:none;">
+                <div class="file-info">
+                    <span class="file-icon">🖼️</span>
+                    <span class="file-name" id="file-name"></span>
+                </div>
+            </div>
+        </label>
+        <button type="button" id="clear-file" class="btn"
+            style="display:none; margin-bottom:1rem; background:#ef4444;">Clear Selection</button>
+
+        <div id="file-list" style="margin-bottom: 1rem;"></div>
+
+        <div class="form-group">
+            <label for="page_size">Page Size</label>
+            <select id="page_size" name="page_size">
+                <option value="A4">A4</option>
+                <option value="Letter">Letter</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn">
+            <span class="btn-text">Convert to PDF</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <div class="result-area" id="result-area" style="display:none;">
+        <div class="result-success">
+            <div class="result-icon">✅</div>
+            <h3>Conversion Complete!</h3>
+            <a href="#" id="download-link" class="btn btn-success" download>Download PDF</a>
+        </div>
+    </div>
+
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+
+<!-- Global Loader Overlay -->
+<div class="loader-overlay" id="loader-overlay">
+    <div class="loader-container">
+        <div class="loader-icon">🖼️</div>
+        <h2 class="loader-title">Converting Images to PDF</h2>
+        <p class="loader-status" id="loader-status">Processing...</p>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-text">
+            <span id="progress-stage">Initializing...</span>
+            <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+
+        <div class="eta-display">
+            <div class="eta-label">Estimated Time Remaining</div>
+            <div class="eta-time" id="eta-time">Calculating...</div>
+        </div>
+
+        <div class="loader-warning">
+            <span class="loader-warning-icon">⚠️</span>
+            <span>Please do not refresh or close this page</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // ========================================
+        // Element References
+        // ========================================
+        var fileInput = document.getElementById('images-file-input');
+        var uploadContent = document.getElementById('upload-content');
+        var filePreview = document.getElementById('file-preview');
+        var fileNameSpan = document.getElementById('file-name');
+        var clearBtn = document.getElementById('clear-file');
+        var fileList = document.getElementById('file-list');
+        var form = document.getElementById('img2pdf-form');
+        var convertBtn = document.getElementById('convert-btn');
+        var resultArea = document.getElementById('result-area');
+        var downloadLink = document.getElementById('download-link');
+        var errorArea = document.getElementById('error-area');
+        var errorMessage = document.getElementById('error-message');
+
+        // Loader elements
+        var loaderOverlay = document.getElementById('loader-overlay');
+        var loaderStatus = document.getElementById('loader-status');
+        var progressBar = document.getElementById('progress-bar');
+        var progressStage = document.getElementById('progress-stage');
+        var progressPercent = document.getElementById('progress-percent');
+        var etaTime = document.getElementById('eta-time');
+
+        // State variables
+        var isProcessing = false;
+        var progressInterval = null;
+        var currentProgress = 0;
+        var estimatedTotalTime = 0;
+        var startTime = 0;
+
+        // ========================================
+        // Utility Functions
+        // ========================================
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        }
+
+        function formatETA(seconds) {
+            if (seconds < 0 || !isFinite(seconds)) return 'Calculating...';
+            var mins = Math.floor(seconds / 60);
+            var secs = Math.floor(seconds % 60);
+            if (mins > 0) return mins + ' min ' + secs + ' sec';
+            return secs + ' seconds';
+        }
+
+        function estimateProcessingTime(fileCount, totalSize) {
+            // Base time per image + size factor
+            var baseTime = fileCount * 0.5;
+            var sizeFactor = totalSize / (1024 * 1024) * 0.5;
+            return Math.max(3, Math.ceil(baseTime + sizeFactor) + 2);
+        }
+
+        // ========================================
+        // Loader Functions
+        // ========================================
+
+        function showLoader(fileCount, totalSize) {
+            estimatedTotalTime = estimateProcessingTime(fileCount, totalSize);
+            currentProgress = 0;
+            startTime = Date.now();
+
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('indeterminate');
+            progressPercent.textContent = '0%';
+            progressStage.textContent = 'Initializing...';
+            loaderStatus.textContent = 'Reading images...';
+            etaTime.textContent = formatETA(estimatedTotalTime);
+
+            loaderOverlay.classList.add('active');
+            isProcessing = true;
+
+            startProgressSimulation(fileCount);
+        }
+
+        function hideLoader() {
+            isProcessing = false;
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            loaderOverlay.classList.remove('active');
+        }
+
+        function startProgressSimulation(fileCount) {
+            if (progressInterval) clearInterval(progressInterval);
+
+            var stages = [
+                { percent: 15, stage: 'Reading images...', status: 'Loading ' + fileCount + ' images' },
+                { percent: 40, stage: 'Processing images...', status: 'Resizing and optimizing' },
+                { percent: 70, stage: 'Creating PDF...', status: 'Building PDF pages' },
+                { percent: 90, stage: 'Finalizing...', status: 'Saving PDF document' }
+            ];
+
+            var currentStageIndex = 0;
+
+            progressInterval = setInterval(function () {
+                if (!isProcessing) {
+                    clearInterval(progressInterval);
+                    return;
+                }
+
+                var elapsedTime = (Date.now() - startTime) / 1000;
+                var timeBasedProgress = Math.min(95, (elapsedTime / estimatedTotalTime) * 100);
+
+                if (currentProgress < timeBasedProgress) {
+                    currentProgress = Math.min(currentProgress + 3, timeBasedProgress);
+                }
+
+                for (var i = stages.length - 1; i >= 0; i--) {
+                    if (currentProgress >= stages[i].percent) {
+                        if (currentStageIndex !== i) {
+                            currentStageIndex = i;
+                            progressStage.textContent = stages[i].stage;
+                            loaderStatus.textContent = stages[i].status;
+                        }
+                        break;
+                    }
+                }
+
+                progressBar.style.width = currentProgress + '%';
+                progressPercent.textContent = Math.floor(currentProgress) + '%';
+
+                var remainingTime = estimatedTotalTime - elapsedTime;
+                if (remainingTime < 0) {
+                    etaTime.textContent = 'Almost done...';
+                    if (!progressBar.classList.contains('indeterminate') && currentProgress >= 95) {
+                        progressBar.classList.add('indeterminate');
+                    }
+                } else {
+                    etaTime.textContent = formatETA(remainingTime);
+                }
+            }, 400);
+        }
+
+        function completeProgress() {
+            currentProgress = 100;
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('indeterminate');
+            progressPercent.textContent = '100%';
+            progressStage.textContent = 'Complete!';
+            loaderStatus.textContent = 'PDF created successfully!';
+            etaTime.textContent = 'Done!';
+
+            setTimeout(function () {
+                hideLoader();
+            }, 800);
+        }
+
+        // ========================================
+        // UI State Functions
+        // ========================================
+
+        function resetUIState() {
+            resultArea.style.display = 'none';
+            errorArea.style.display = 'none';
+            if (downloadLink.href && downloadLink.href.startsWith('blob:')) {
+                URL.revokeObjectURL(downloadLink.href);
+            }
+            downloadLink.href = '#';
+        }
+
+        function setButtonLoading(loading) {
+            if (loading) {
+                convertBtn.classList.add('processing');
+                convertBtn.disabled = true;
+            } else {
+                convertBtn.classList.remove('processing');
+                convertBtn.disabled = false;
+            }
+        }
+
+        function updateFileList() {
+            fileList.innerHTML = '';
+            if (fileInput.files.length > 0) {
+                var totalSize = 0;
+                for (var i = 0; i < fileInput.files.length; i++) {
+                    var div = document.createElement('div');
+                    div.style.cssText = 'padding: 0.5rem; background: var(--dark); border-radius: 6px; margin-bottom: 0.5rem; display: flex; justify-content: space-between;';
+                    div.innerHTML = '<span>' + (i + 1) + '. ' + fileInput.files[i].name + '</span><span style="color: var(--gray-light);">' + formatSize(fileInput.files[i].size) + '</span>';
+                    fileList.appendChild(div);
+                    totalSize += fileInput.files[i].size;
+                }
+                var summary = document.createElement('div');
+                summary.style.cssText = 'padding: 0.5rem; color: var(--primary); font-weight: 600;';
+                summary.textContent = 'Total: ' + fileInput.files.length + ' images (' + formatSize(totalSize) + ')';
+                fileList.appendChild(summary);
+            }
+        }
+
+        // ========================================
+        // Event Handlers
+        // ========================================
+
+        fileInput.onchange = function () {
+            resetUIState();
+            if (fileInput.files && fileInput.files.length > 0) {
+                var count = fileInput.files.length;
+                fileNameSpan.textContent = count + ' image' + (count > 1 ? 's' : '') + ' selected';
+                uploadContent.style.display = 'none';
+                filePreview.style.display = 'flex';
+                clearBtn.style.display = 'block';
+                updateFileList();
+            }
+        };
+
+        clearBtn.onclick = function (e) {
+            e.preventDefault();
+            fileInput.value = '';
+            uploadContent.style.display = 'block';
+            filePreview.style.display = 'none';
+            clearBtn.style.display = 'none';
+            fileList.innerHTML = '';
+            resetUIState();
+        };
+
+        downloadLink.onclick = function () {
+            setTimeout(function () {
+                resetUIState();
+                fileInput.value = '';
+                uploadContent.style.display = 'block';
+                filePreview.style.display = 'none';
+                clearBtn.style.display = 'none';
+                fileList.innerHTML = '';
+            }, 1000);
+        };
+
+        form.onsubmit = async function (e) {
+            e.preventDefault();
+
+            if (isProcessing) return;
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select at least one image');
+                return;
+            }
+
+            resetUIState();
+            var formData = new FormData(form);
+            var totalSize = 0;
+            for (var i = 0; i < fileInput.files.length; i++) {
+                totalSize += fileInput.files[i].size;
+            }
+
+            setButtonLoading(true);
+            showLoader(fileInput.files.length, totalSize);
+
+            try {
+                var response = await fetch('/api/pdf/images-to-pdf/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    var blob = await response.blob();
+                    completeProgress();
+
+                    downloadLink.href = URL.createObjectURL(blob);
+                    downloadLink.download = 'images.pdf';
+
+                    // Add to history
+                    if (window.addToHistory) {
+                        window.addToHistory({
+                            tool: 'Images to PDF',
+                            icon: '🖼️',
+                            fileName: fileInput.files.length + ' images',
+                            details: 'Created PDF document'
+                        });
+                    }
+
+                    setTimeout(function () {
+                        resultArea.style.display = 'block';
+                    }, 900);
+                } else {
+                    hideLoader();
+                    var errText = 'Conversion failed';
+                    try {
+                        var data = await response.json();
+                        errText = data.error || data.details || errText;
+                    } catch (ex) { }
+                    errorMessage.textContent = errText;
+                    errorArea.style.display = 'block';
+                }
+            } catch (err) {
+                hideLoader();
+                errorMessage.textContent = 'Error: ' + err.message;
+                errorArea.style.display = 'block';
+            } finally {
+                setButtonLoading(false);
+            }
+        };
+
+        window.onbeforeunload = function (e) {
+            if (isProcessing) {
+                e.preventDefault();
+                e.returnValue = 'PDF creation is in progress. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        };
+    })();
+</script>
+{% endblock %}

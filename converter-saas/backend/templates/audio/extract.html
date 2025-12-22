@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+{% block title %}Extract Audio from Video{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <h1>🎬➡️🎵 Extract Audio</h1>
+    <p>Extract audio track from video files</p>
+</section>
+
+<div class="converter-container">
+    <form id="extract-form" class="converter-form" enctype="multipart/form-data">
+        <label class="upload-area" for="extract-file-input">
+            <input type="file" id="extract-file-input" name="file" accept="video/*" style="display:none;">
+            <div class="upload-content" id="upload-content">
+                <div class="upload-icon">🎬</div>
+                <p>Click to select video file</p>
+            </div>
+            <div class="file-preview" id="file-preview" style="display:none;">
+                <div class="file-info">
+                    <span class="file-icon">🎬</span>
+                    <span class="file-name" id="file-name"></span>
+                </div>
+            </div>
+        </label>
+        <button type="button" id="clear-file" class="btn"
+            style="display:none; margin-bottom:1rem; background:#ef4444;">Clear</button>
+
+        <div class="form-group">
+            <label for="output_format">Output Format</label>
+            <select id="output_format" name="output_format" required>
+                <option value="mp3">MP3</option>
+                <option value="wav">WAV</option>
+                <option value="aac">AAC</option>
+                <option value="flac">FLAC</option>
+                <option value="m4a">M4A</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="convert-btn">
+            <span class="btn-text">Extract Audio</span>
+            <span class="btn-loading-content">
+                <span class="btn-spinner"></span>
+                <span>Processing...</span>
+            </span>
+        </button>
+    </form>
+
+    <div class="result-area" id="result-area" style="display:none;">
+        <div class="result-success">
+            <div class="result-icon">✅</div>
+            <h3>Extraction Complete!</h3>
+            <a href="#" id="download-link" class="btn btn-success" download>Download Audio</a>
+        </div>
+    </div>
+    <div class="error-area" id="error-area" style="display:none;">
+        <div class="error-icon">❌</div>
+        <p id="error-message"></p>
+    </div>
+</div>
+
+<!-- Global Loader Overlay -->
+<div class="loader-overlay" id="loader-overlay">
+    <div class="loader-container">
+        <div class="loader-icon">🎬➡️🎵</div>
+        <h2 class="loader-title">Extracting Audio</h2>
+        <p class="loader-status" id="loader-status">Processing...</p>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+        </div>
+
+        <div class="progress-text">
+            <span id="progress-stage">Initializing...</span>
+            <span class="progress-percent" id="progress-percent">0%</span>
+        </div>
+
+        <div class="eta-display">
+            <div class="eta-label">Estimated Time Remaining</div>
+            <div class="eta-time" id="eta-time">Calculating...</div>
+        </div>
+
+        <div class="loader-warning">
+            <span class="loader-warning-icon">⚠️</span>
+            <span>Please do not refresh or close this page</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // ========================================
+        // Element References
+        // ========================================
+        var fileInput = document.getElementById('extract-file-input');
+        var uploadContent = document.getElementById('upload-content');
+        var filePreview = document.getElementById('file-preview');
+        var fileNameSpan = document.getElementById('file-name');
+        var clearBtn = document.getElementById('clear-file');
+        var form = document.getElementById('extract-form');
+        var convertBtn = document.getElementById('convert-btn');
+        var resultArea = document.getElementById('result-area');
+        var downloadLink = document.getElementById('download-link');
+        var errorArea = document.getElementById('error-area');
+        var errorMessage = document.getElementById('error-message');
+
+        // Loader elements
+        var loaderOverlay = document.getElementById('loader-overlay');
+        var loaderStatus = document.getElementById('loader-status');
+        var progressBar = document.getElementById('progress-bar');
+        var progressStage = document.getElementById('progress-stage');
+        var progressPercent = document.getElementById('progress-percent');
+        var etaTime = document.getElementById('eta-time');
+
+        // State variables
+        var isProcessing = false;
+        var progressInterval = null;
+        var currentProgress = 0;
+        var estimatedTotalTime = 0;
+        var startTime = 0;
+
+        // ========================================
+        // Utility Functions
+        // ========================================
+
+        function formatSize(bytes) {
+            if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + ' KB';
+            }
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function formatETA(seconds) {
+            if (seconds < 0 || !isFinite(seconds)) return 'Calculating...';
+            var mins = Math.floor(seconds / 60);
+            var secs = Math.floor(seconds % 60);
+            if (mins > 0) return mins + ' min ' + secs + ' sec';
+            return secs + ' seconds';
+        }
+
+        function estimateProcessingTime(fileSizeBytes) {
+            var sizeMB = fileSizeBytes / (1024 * 1024);
+            // Audio extraction is moderately fast
+            return Math.max(3, Math.ceil(sizeMB * 0.8) + 2);
+        }
+
+        // ========================================
+        // Loader Functions
+        // ========================================
+
+        function showLoader(fileSizeBytes) {
+            estimatedTotalTime = estimateProcessingTime(fileSizeBytes);
+            currentProgress = 0;
+            startTime = Date.now();
+
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('indeterminate');
+            progressPercent.textContent = '0%';
+            progressStage.textContent = 'Initializing...';
+            loaderStatus.textContent = 'Preparing video file...';
+            etaTime.textContent = formatETA(estimatedTotalTime);
+
+            loaderOverlay.classList.add('active');
+            isProcessing = true;
+
+            startProgressSimulation();
+        }
+
+        function hideLoader() {
+            isProcessing = false;
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            loaderOverlay.classList.remove('active');
+        }
+
+        function startProgressSimulation() {
+            if (progressInterval) clearInterval(progressInterval);
+
+            var stages = [
+                { percent: 15, stage: 'Reading video...', status: 'Analyzing source file' },
+                { percent: 35, stage: 'Finding audio track...', status: 'Locating audio stream' },
+                { percent: 60, stage: 'Extracting audio...', status: 'Separating audio from video' },
+                { percent: 80, stage: 'Encoding output...', status: 'Converting to target format' },
+                { percent: 95, stage: 'Finalizing...', status: 'Saving audio file' }
+            ];
+
+            var currentStageIndex = 0;
+
+            progressInterval = setInterval(function () {
+                if (!isProcessing) {
+                    clearInterval(progressInterval);
+                    return;
+                }
+
+                var elapsedTime = (Date.now() - startTime) / 1000;
+                var timeBasedProgress = Math.min(95, (elapsedTime / estimatedTotalTime) * 100);
+
+                if (currentProgress < timeBasedProgress) {
+                    currentProgress = Math.min(currentProgress + 3, timeBasedProgress);
+                }
+
+                for (var i = stages.length - 1; i >= 0; i--) {
+                    if (currentProgress >= stages[i].percent) {
+                        if (currentStageIndex !== i) {
+                            currentStageIndex = i;
+                            progressStage.textContent = stages[i].stage;
+                            loaderStatus.textContent = stages[i].status;
+                        }
+                        break;
+                    }
+                }
+
+                progressBar.style.width = currentProgress + '%';
+                progressPercent.textContent = Math.floor(currentProgress) + '%';
+
+                var remainingTime = estimatedTotalTime - elapsedTime;
+                if (remainingTime < 0) {
+                    etaTime.textContent = 'Almost done...';
+                    if (!progressBar.classList.contains('indeterminate') && currentProgress >= 95) {
+                        progressBar.classList.add('indeterminate');
+                    }
+                } else {
+                    etaTime.textContent = formatETA(remainingTime);
+                }
+
+            }, 400);
+        }
+
+        function completeProgress() {
+            currentProgress = 100;
+            progressBar.style.width = '100%';
+            progressBar.classList.remove('indeterminate');
+            progressPercent.textContent = '100%';
+            progressStage.textContent = 'Complete!';
+            loaderStatus.textContent = 'Extraction successful!';
+            etaTime.textContent = 'Done!';
+
+            setTimeout(function () {
+                hideLoader();
+            }, 800);
+        }
+
+        // ========================================
+        // UI State Functions
+        // ========================================
+
+        function resetUIState() {
+            resultArea.style.display = 'none';
+            errorArea.style.display = 'none';
+            downloadLink.href = '#';
+        }
+
+        function setButtonLoading(loading) {
+            if (loading) {
+                convertBtn.classList.add('processing');
+                convertBtn.disabled = true;
+            } else {
+                convertBtn.classList.remove('processing');
+                convertBtn.disabled = false;
+            }
+        }
+
+        // ========================================
+        // Event Handlers
+        // ========================================
+
+        fileInput.onchange = function () {
+            resetUIState();
+            if (fileInput.files && fileInput.files.length > 0) {
+                fileNameSpan.textContent = fileInput.files[0].name + ' (' + formatSize(fileInput.files[0].size) + ')';
+                uploadContent.style.display = 'none';
+                filePreview.style.display = 'flex';
+                clearBtn.style.display = 'block';
+            }
+        };
+
+        clearBtn.onclick = function (e) {
+            e.preventDefault();
+            fileInput.value = '';
+            uploadContent.style.display = 'block';
+            filePreview.style.display = 'none';
+            clearBtn.style.display = 'none';
+            resetUIState();
+        };
+
+        form.onsubmit = async function (e) {
+            e.preventDefault();
+
+            if (isProcessing) return;
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a video file');
+                return;
+            }
+
+            resetUIState();
+            var formData = new FormData(form);
+
+            setButtonLoading(true);
+            showLoader(fileInput.files[0].size);
+
+            try {
+                var response = await fetch('/api/audio/extract/', { method: 'POST', body: formData });
+                var data = await response.json();
+
+                if (response.ok && data.download_url) {
+                    completeProgress();
+                    downloadLink.href = data.download_url;
+                    setTimeout(function () {
+                        resultArea.style.display = 'block';
+                    }, 900);
+                } else {
+                    hideLoader();
+                    errorMessage.textContent = data.error || 'Extraction failed';
+                    errorArea.style.display = 'block';
+                }
+            } catch (err) {
+                hideLoader();
+                errorMessage.textContent = 'Error: ' + err.message;
+                errorArea.style.display = 'block';
+            } finally {
+                setButtonLoading(false);
+            }
+        };
+
+        window.onbeforeunload = function (e) {
+            if (isProcessing) {
+                e.preventDefault();
+                e.returnValue = 'Audio extraction is in progress. Are you sure you want to leave?';
+                return e.returnValue;
+            }
+        };
+    })();
+</script>
+{% endblock %}
