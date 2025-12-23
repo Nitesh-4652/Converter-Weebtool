@@ -18,7 +18,7 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') + ['.ngrok.io', '.ngrok-free.app', '.ngrok-free.dev']
 
 
 # Application definition
@@ -148,6 +148,9 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
 
+# CSRF Configuration for Ngrok
+CSRF_TRUSTED_ORIGINS = ['https://*.ngrok.io', 'https://*.ngrok-free.app', 'https://*.ngrok-free.dev']
+
 
 # File Upload Configuration
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
@@ -184,8 +187,8 @@ FFMPEG_PATH = os.environ.get('FFMPEG_PATH', 'ffmpeg')
 FFPROBE_PATH = os.environ.get('FFPROBE_PATH', 'ffprobe')
 
 
-# File Expiry Settings (in hours)
-CONVERTED_FILE_EXPIRY_HOURS = 24
+# File Expiry Settings (in hours) - Backup cleanup for missed downloads
+CONVERTED_FILE_EXPIRY_HOURS = 1
 
 
 # Rate Limiting (requests per hour per IP)
@@ -217,3 +220,12 @@ CELERY_TASK_SOFT_TIME_LIMIT = 3300  # 55 min soft limit
 # Reliability
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_TASK_ACKS_LATE = True
+
+# Celery Beat Schedule - Periodic Tasks
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-expired-files': {
+        'task': 'apps.core.tasks.cleanup_expired_files',
+        'schedule': 30 * 60,  # Every 30 minutes
+    },
+}
+

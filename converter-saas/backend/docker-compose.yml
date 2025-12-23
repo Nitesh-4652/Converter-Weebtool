@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=converter_db
+      - POSTGRES_USER=converter_user
+      - POSTGRES_PASSWORD=your-secure-password
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+
+  web:
+    build: .
+    command: gunicorn --bind 0.0.0.0:8000 config.wsgi:application
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    environment:
+      - DJANGO_DEBUG=False
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - USE_ASYNC_CONVERSION=True
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: .
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - .:/app
+      - media_volume:/app/media
+    environment:
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+      - USE_ASYNC_CONVERSION=True
+    depends_on:
+      - db
+      - redis
+
+  beat:
+    build: .
+    command: celery -A config beat --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+      - worker
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+
+

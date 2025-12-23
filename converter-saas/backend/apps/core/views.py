@@ -135,6 +135,7 @@ class DownloadFileView(APIView):
     def get(self, request, file_id):
         """Download file by ID."""
         from django.http import FileResponse
+        import os
         
         try:
             converted_file = ConvertedFile.objects.get(id=file_id)
@@ -145,15 +146,42 @@ class DownloadFileView(APIView):
                     status=status.HTTP_410_GONE
                 )
             
-            # Record download
-            converted_file.record_download()
+            # Get file path and name before serving
+            file_path = converted_file.output_file.path
+            file_name = converted_file.output_file.name.split('/')[-1]
             
-            # Return file
-            response = FileResponse(
-                converted_file.output_file.open('rb'),
-                as_attachment=True,
-                filename=converted_file.output_file.name.split('/')[-1]
+            # Read entire file into memory for serving
+            with open(file_path, 'rb') as f:
+                file_content = f.read()
+            
+            # Create response from memory
+            from django.http import HttpResponse
+            response = HttpResponse(
+                file_content,
+                content_type='application/octet-stream'
             )
+            response['Content-Disposition'] = f'attachment; filename="{file_name}"'
+            response['Content-Length'] = len(file_content)
+            
+            # Cleanup: Delete files after serving
+            try:
+                # Delete output file
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                
+                # Delete input file from conversion job
+                if converted_file.conversion_job:
+                    job = converted_file.conversion_job
+                    if job.input_file and os.path.exists(job.input_file.path):
+                        os.remove(job.input_file.path)
+                    if job.output_file and os.path.exists(job.output_file.path):
+                        os.remove(job.output_file.path)
+                
+                # Delete database records
+                converted_file.delete()
+            except Exception:
+                pass  # Ignore cleanup errors, file was served successfully
+            
             return response
             
         except ConvertedFile.DoesNotExist:
