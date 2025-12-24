@@ -57,10 +57,18 @@ def convert_to_pdf_task(self, job_id, options):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='pdf',
+            original_filename=clean_filename,
             file_size=get_file_size(output_path)
         )
         
@@ -92,9 +100,18 @@ def merge_pdfs_task(self, job_id, options):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name='merged',
+            output_format='pdf'
+        )
+        
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
+            original_filename=clean_filename,
             output_format='pdf',
             file_size=get_file_size(output_path)
         )
@@ -137,10 +154,18 @@ def split_pdf_task(self, job_id, page_ranges):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='zip',
+            original_filename=clean_filename,
             file_size=get_file_size(zip_path)
         )
         
@@ -174,10 +199,18 @@ def compress_pdf_task(self, job_id, quality):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='pdf',
+            original_filename=clean_filename,
             file_size=get_file_size(output_path)
         )
         
@@ -209,10 +242,18 @@ def rotate_pdf_task(self, job_id, rotation, pages):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='pdf',
+            original_filename=clean_filename,
             file_size=get_file_size(output_path)
         )
         
@@ -244,10 +285,18 @@ def protect_pdf_task(self, job_id, password, owner_password):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='pdf',
+            original_filename=clean_filename,
             file_size=get_file_size(output_path)
         )
         
@@ -279,10 +328,18 @@ def unlock_pdf_task(self, job_id, password):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='pdf',
+            original_filename=clean_filename,
             file_size=get_file_size(output_path)
         )
         
@@ -316,10 +373,18 @@ def images_to_pdf_task(self, job_id, options):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='pdf',
+            original_filename=clean_filename,
             file_size=get_file_size(output_path)
         )
         
@@ -361,10 +426,18 @@ def pdf_to_images_task(self, job_id, output_format, dpi):
             
         job.mark_completed(job.output_file.name)
         
+        
+        # Generate clean filename for user
+        from apps.core.utils import generate_clean_output_filename
+        clean_filename = generate_clean_output_filename(
+            original_name=job.input_file.name.split('/')[-1],
+            output_format='pdf'
+        )
         ConvertedFile.objects.create(
             conversion_job=job,
             output_file=job.output_file,
             output_format='zip',
+            original_filename=clean_filename,
             file_size=get_file_size(zip_path)
         )
         

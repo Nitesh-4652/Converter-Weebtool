@@ -197,6 +197,12 @@ class PDFMergeView(BaseConversionView):
         temp_dir = settings.UPLOAD_DIR / 'temp' / 'merge'
         temp_dir.mkdir(parents=True, exist_ok=True)
         
+        # Define output path and filename BEFORE try block to ensure scope
+        output_filename = f'merged_{int(time.time())}.pdf'
+        output_dir = settings.OUTPUT_DIR / 'pdf'
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = str(output_dir / output_filename)
+        
         input_paths = []
         try:
             for i, f in enumerate(files):
@@ -228,17 +234,35 @@ class PDFMergeView(BaseConversionView):
             # Merge PDFs
             merge_pdfs(input_paths, output_path)
             
+            # Save to job and create ConvertedFile
+            from apps.core.utils import generate_clean_output_filename
+            
+            with open(output_path, 'rb') as f:
+                job.output_file.save(output_filename, File(f), save=False)
+            
+            job.mark_completed(job.output_file.name)
+            
+            # Generate clean filename for user
+            clean_filename = generate_clean_output_filename(
+                original_name=files[0].name,
+                output_format='pdf'
+            )
+            
+            converted_file = ConvertedFile.objects.create(
+                conversion_job=job,
+                output_file=job.output_file,
+                original_filename=clean_filename,
+                output_format='pdf',
+                file_size=get_file_size(output_path)
+            )
+            
             # Log usage
             processing_time_ms = int((time.time() - start_time) * 1000)
             self.log_usage(request, success=True, job=job, processing_time_ms=processing_time_ms)
             
-            # Return file
-            response = FileResponse(
-                open(output_path, 'rb'),
-                as_attachment=True,
-                filename=output_filename
-            )
-            return response
+            # Return job data with download URL
+            response_serializer = ConversionJobSerializer(job, context={'request': request})
+            return Response(response_serializer.data, status=status.HTTP_200_OK)
         
         except PDFError as e:
             return Response(
@@ -251,6 +275,9 @@ class PDFMergeView(BaseConversionView):
             for path in input_paths:
                 if os.path.exists(path):
                     os.remove(path)
+            # Clean up output temp file
+            if os.path.exists(output_path):
+                os.remove(output_path)
 
 
 class PDFSplitView(BaseConversionView):
