@@ -3,7 +3,7 @@ Core Tasks for File Converter SaaS.
 Shared base task and utilities for background processing.
 """
 
-from celery import shared_task, Task
+from apps.core.celery_compat import shared_task, Task, CELERY_AVAILABLE
 from django.utils import timezone
 from .models import ConversionJob, ConvertedFile, JobStatus
 import logging

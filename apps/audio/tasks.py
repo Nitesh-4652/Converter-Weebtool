@@ -7,7 +7,7 @@ import os
 import time
 from django.conf import settings
 from django.core.files import File
-from celery import shared_task
+from apps.core.celery_compat import shared_task
 
 from apps.core.models import ConversionJob, ConvertedFile
 from apps.core.tasks import BaseConversionTask, update_job_processing
