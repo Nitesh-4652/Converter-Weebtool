@@ -53,6 +53,55 @@ def ensure_directory(path: str) -> None:
     Path(path).mkdir(parents=True, exist_ok=True)
 
 
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize filename for safe storage and display.
+    Removes unsafe characters but preserves readability.
+    
+    Args:
+        filename: Original filename
+    
+    Returns:
+        Sanitized filename safe for filesystems
+    """
+    import re
+    
+    # Remove or replace unsafe characters
+    # Keep alphanumeric, spaces, hyphens, underscores, dots
+    sanitized = re.sub(r'[^\w\s\-\.]', '_', filename)
+    
+    # Remove multiple consecutive underscores/spaces
+    sanitized = re.sub(r'_{2,}', '_', sanitized)
+    sanitized = re.sub(r'\s{2,}', ' ', sanitized)
+    
+    # Trim and limit length
+    sanitized = sanitized.strip(' _.')[:255]
+    
+    return sanitized or 'file'
+
+
+def generate_clean_output_filename(original_name: str, output_format: str) -> str:
+    """
+    Generate clean output filename for user download.
+    No hashes, just original name + new extension.
+    
+    Args:
+        original_name: Original filename from user upload
+        output_format: Target format extension
+    
+    Returns:
+        Clean filename like "song.mp3" instead of "abc123_def456_song.mp3"
+    """
+    # Extract base name (remove extension)
+    base_name = original_name.rsplit('.', 1)[0] if '.' in original_name else original_name
+    
+    # Sanitize for safety
+    clean_base = sanitize_filename(base_name)
+    
+    # Return clean name with new extension
+    return f'{clean_base}.{output_format.lower()}'
+
+
 def get_client_ip(request) -> str:
     """Extract client IP from request."""
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')

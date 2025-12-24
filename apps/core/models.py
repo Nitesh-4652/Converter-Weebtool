@@ -250,6 +250,15 @@ class ConvertedFile(models.Model):
         max_length=500
     )
     output_format = models.CharField(max_length=20)
+    
+    # User-friendly filename (clean, no hashes)
+    original_filename = models.CharField(
+        max_length=500,
+        help_text='Clean filename shown to user (e.g., "song.mp3")',
+        blank=True,
+        default=''
+    )
+    
     file_size = models.BigIntegerField(
         help_text='Output file size in bytes'
     )

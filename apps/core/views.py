@@ -225,9 +225,11 @@ class DownloadFileView(APIView):
                     status=status.HTTP_410_GONE
                 )
             
-            # Get file path and name
+            # Get file path and clean filename
             file_path = converted_file.output_file.path
-            file_name = converted_file.output_file.name.split('/')[-1]
+            
+            # Use original_filename if set, otherwise extract from file path
+            file_name = converted_file.original_filename or converted_file.output_file.name.split('/')[-1]
             
             if not os.path.exists(file_path):
                 return Response(

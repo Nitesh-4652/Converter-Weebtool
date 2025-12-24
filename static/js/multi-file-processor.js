@@ -634,20 +634,73 @@
     MultiFileProcessor.prototype.showResults = function () {
         if (!this.elements.resultsContainer || this.results.length === 0) return;
 
+        var self = this;
         var html = '';
         this.results.forEach(function (result) {
             html += '<div class="batch-result-item">' +
                 '<span class="batch-result-name">' + result.filename + '</span>' +
-                '<a href="' + result.downloadUrl + '" class="batch-result-download" download="' + result.filename + '">Download</a>' +
+                '<a href="' + result.downloadUrl + '" class="batch-result-download" data-filename="' + result.filename + '">Download</a>' +
                 '</div>';
         });
 
         var listEl = this.elements.resultsContainer.querySelector('.batch-results-list');
         if (listEl) {
             listEl.innerHTML = html;
+
+            // Bind download click handlers
+            listEl.querySelectorAll('.batch-result-download').forEach(function (link) {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    self.handleDownloadClick(link.href, link.dataset.filename);
+                });
+            });
         }
 
         this.elements.resultsContainer.style.display = 'block';
+    };
+
+    /**
+     * Handle download link click
+     * Fetches file as blob and triggers download programmatically
+     * This ensures downloads work on all cloud platforms
+     * @param {string} url - Download URL
+     * @param {string} filename - Suggested filename
+     */
+    MultiFileProcessor.prototype.handleDownloadClick = function (url, filename) {
+        var self = this;
+
+        // Show a brief loading indicator
+        console.log('Downloading:', filename);
+
+        fetch(url)
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Download failed: ' + response.status);
+                }
+                return response.blob();
+            })
+            .then(function (blob) {
+                // Create a temporary object URL
+                var blobUrl = URL.createObjectURL(blob);
+
+                // Create a temporary link and trigger download
+                var tempLink = document.createElement('a');
+                tempLink.href = blobUrl;
+                tempLink.download = filename;
+                tempLink.style.display = 'none';
+                document.body.appendChild(tempLink);
+                tempLink.click();
+
+                // Clean up
+                setTimeout(function () {
+                    document.body.removeChild(tempLink);
+                    URL.revokeObjectURL(blobUrl);
+                }, 100);
+            })
+            .catch(function (error) {
+                console.error('Download error:', error);
+                alert('Download failed. Please try again.');
+            });
     };
 
     /**

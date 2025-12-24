@@ -1360,3 +1360,19 @@ label.upload-area>* {
     text-overflow: ellipsis;
     max-width: 70%;
 }
+
+/* Additional overflow protection for long filenames */
+.batch-queue-item-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.loader-status,
+.progress-stage {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
