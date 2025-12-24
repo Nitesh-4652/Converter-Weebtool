@@ -61,11 +61,13 @@ class HealthCheckView(APIView):
     def get(self, request):
         """Return system health status."""
         from django.conf import settings
+        from django.db import connection
         import shutil
+        import subprocess
         
         show_details = getattr(settings, 'HEALTH_CHECK_SENSITIVE_INFO', False) or settings.DEBUG
         
-        # Check database
+        # Check database connection
         db_status = 'healthy'
         db_error = None
         try:
@@ -74,11 +76,35 @@ class HealthCheckView(APIView):
         except Exception as e:
             db_status = 'unhealthy'
             db_error = str(e)
+            
+        # Check Database Schema (Tables)
+        schema_status = 'healthy'
+        missing_tables = []
+        required_tables = [
+            'conversion_jobs', 
+            'uploaded_files', 
+            'converted_files',
+            'tool_usage_logs'
+        ]
+        
+        try:
+            existing_tables = connection.introspection.table_names()
+            for table in required_tables:
+                if table not in existing_tables:
+                    missing_tables.append(table)
+            
+            if missing_tables:
+                schema_status = 'unhealthy'
+        except Exception as e:
+            schema_status = 'unknown'
+            db_error = f"{db_error} | Schema Error: {str(e)}" if db_error else f"Schema Error: {str(e)}"
         
         # Check FFmpeg
         ffmpeg_status = 'healthy'
         ffmpeg_error = None
         try:
+            # Use utility if possible, or direct path
+            from apps.core.utils import get_ffmpeg_path
             result = subprocess.run(
                 [get_ffmpeg_path(), '-version'],
                 capture_output=True,
@@ -87,9 +113,6 @@ class HealthCheckView(APIView):
             if result.returncode != 0:
                 ffmpeg_status = 'unhealthy'
                 ffmpeg_error = 'FFmpeg process returned non-zero exit code'
-        except FileNotFoundError:
-            ffmpeg_status = 'unhealthy'
-            ffmpeg_error = 'FFmpeg not found'
         except Exception as e:
             ffmpeg_status = 'unhealthy'
             ffmpeg_error = str(e)
@@ -100,37 +123,49 @@ class HealthCheckView(APIView):
         try:
             total, used, free = shutil.disk_usage(settings.MEDIA_ROOT)
             free_gb = free / (2**30)
-            if free_gb < 1:  # Less than 1GB free
+            if free_gb < 0.5:  # Less than 500MB free
                 storage_status = 'warning'
             storage_info = {
                 'free_gb': round(free_gb, 2),
-                'total_gb': round(total / (2**30), 2)
+                'total_gb': round(total / (2**30), 2),
+                'used_percent': round((used / total) * 100, 1)
             }
         except Exception as e:
             storage_status = 'unknown'
             storage_info = {'error': str(e)}
         
+        # Overall status
+        is_healthy = (
+            db_status == 'healthy' and 
+            schema_status == 'healthy' and 
+            ffmpeg_status == 'healthy' and 
+            storage_status != 'unhealthy'
+        )
+        
         data = {
-            'status': 'healthy' if db_status == 'healthy' and ffmpeg_status == 'healthy' and storage_status != 'unhealthy' else 'degraded',
+            'status': 'healthy' if is_healthy else 'degraded',
             'timestamp': timezone.now(),
-            'version': '1.0.1',
+            'version': '1.0.2',
         }
         
         # Add details based on privacy settings
         if show_details:
             data.update({
                 'database': db_status,
+                'schema': schema_status,
                 'ffmpeg': ffmpeg_status,
                 'storage': storage_status,
                 'details': {
                     'db_error': db_error,
                     'ffmpeg_error': ffmpeg_error,
+                    'missing_tables': missing_tables if missing_tables else None,
                     'storage_info': storage_info
                 }
             })
         else:
             data['checks'] = {
                 'database': db_status == 'healthy',
+                'schema': schema_status == 'healthy',
                 'ffmpeg': ffmpeg_status == 'healthy',
                 'storage': storage_status != 'unhealthy'
             }

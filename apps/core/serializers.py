@@ -204,6 +204,7 @@ class HealthCheckSerializer(serializers.Serializer):
     
     # These fields are included based on show_details
     database = serializers.CharField(required=False)
+    schema = serializers.CharField(required=False)
     ffmpeg = serializers.CharField(required=False)
     storage = serializers.CharField(required=False)
     details = serializers.JSONField(required=False)

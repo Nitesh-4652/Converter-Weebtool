@@ -25,6 +25,10 @@ COPY . .
 
 RUN python manage.py collectstatic --noinput || true
 
+# ✅ STEP 5 — migration & startup
+COPY scripts/entrypoint.sh /app/scripts/entrypoint.sh
+RUN chmod +x /app/scripts/entrypoint.sh
+
 EXPOSE 8000
 
-CMD gunicorn --bind 0.0.0.0:8000 config.wsgi:application
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]

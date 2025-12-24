@@ -19,3 +19,7 @@ python-pptx>=0.6.21,<0.7.0
 
 # Utilities
 python-dotenv>=1.0,<2.0
+
+# Database Utilities
+dj-database-url>=2.1.0
+psycopg2-binary>=2.9.9
