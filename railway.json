@@ -3,10 +3,12 @@
   "build": {
     "builder": "DOCKERFILE",
     "dockerfilePath": "converter-saas/backend/Dockerfile",
-    "watchPatterns": ["converter-saas/backend/**"]
+    "buildContext": "converter-saas/backend",
+    "watchPatterns": [
+      "converter-saas/backend/**"
+    ]
   },
   "deploy": {
-    "startCommand": "cd converter-saas/backend && gunicorn --bind 0.0.0.0:$PORT config.wsgi:application",
     "healthcheckPath": "/api/health/",
     "restartPolicyType": "ON_FAILURE"
   }
