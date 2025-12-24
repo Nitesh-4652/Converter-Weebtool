@@ -4,6 +4,7 @@ Home page, health check, and base API views.
 """
 
 import subprocess
+from datetime import timedelta
 from django.views.generic import TemplateView
 from django.utils import timezone
 from django.db import connection
@@ -59,17 +60,24 @@ class HealthCheckView(APIView):
     
     def get(self, request):
         """Return system health status."""
+        from django.conf import settings
+        import shutil
+        
+        show_details = getattr(settings, 'HEALTH_CHECK_SENSITIVE_INFO', False) or settings.DEBUG
         
         # Check database
         db_status = 'healthy'
+        db_error = None
         try:
             with connection.cursor() as cursor:
                 cursor.execute('SELECT 1')
         except Exception as e:
-            db_status = f'unhealthy: {str(e)}'
+            db_status = 'unhealthy'
+            db_error = str(e)
         
         # Check FFmpeg
         ffmpeg_status = 'healthy'
+        ffmpeg_error = None
         try:
             result = subprocess.run(
                 [get_ffmpeg_path(), '-version'],
@@ -77,19 +85,55 @@ class HealthCheckView(APIView):
                 timeout=5
             )
             if result.returncode != 0:
-                ffmpeg_status = 'unhealthy: FFmpeg not working'
+                ffmpeg_status = 'unhealthy'
+                ffmpeg_error = 'FFmpeg process returned non-zero exit code'
         except FileNotFoundError:
-            ffmpeg_status = 'unhealthy: FFmpeg not found'
+            ffmpeg_status = 'unhealthy'
+            ffmpeg_error = 'FFmpeg not found'
         except Exception as e:
-            ffmpeg_status = f'unhealthy: {str(e)}'
+            ffmpeg_status = 'unhealthy'
+            ffmpeg_error = str(e)
+            
+        # Check Storage (Disk space)
+        storage_status = 'healthy'
+        storage_info = {}
+        try:
+            total, used, free = shutil.disk_usage(settings.MEDIA_ROOT)
+            free_gb = free / (2**30)
+            if free_gb < 1:  # Less than 1GB free
+                storage_status = 'warning'
+            storage_info = {
+                'free_gb': round(free_gb, 2),
+                'total_gb': round(total / (2**30), 2)
+            }
+        except Exception as e:
+            storage_status = 'unknown'
+            storage_info = {'error': str(e)}
         
         data = {
-            'status': 'healthy' if db_status == 'healthy' and ffmpeg_status == 'healthy' else 'degraded',
+            'status': 'healthy' if db_status == 'healthy' and ffmpeg_status == 'healthy' and storage_status != 'unhealthy' else 'degraded',
             'timestamp': timezone.now(),
-            'version': '1.0.0',
-            'database': db_status,
-            'ffmpeg': ffmpeg_status, 
+            'version': '1.0.1',
         }
+        
+        # Add details based on privacy settings
+        if show_details:
+            data.update({
+                'database': db_status,
+                'ffmpeg': ffmpeg_status,
+                'storage': storage_status,
+                'details': {
+                    'db_error': db_error,
+                    'ffmpeg_error': ffmpeg_error,
+                    'storage_info': storage_info
+                }
+            })
+        else:
+            data['checks'] = {
+                'database': db_status == 'healthy',
+                'ffmpeg': ffmpeg_status == 'healthy',
+                'storage': storage_status != 'unhealthy'
+            }
         
         serializer = HealthCheckSerializer(data)
         return Response(serializer.data)
@@ -222,6 +266,54 @@ class BaseConversionView(APIView):
                     'remaining_requests': remaining
                 },
                 status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        return None
+        
+    def validate_file_size(self, input_file):
+        """Validate file size against settings."""
+        from django.conf import settings
+        max_size = getattr(settings, 'MAX_UPLOAD_SIZE', 500 * 1024 * 1024)
+        
+        if input_file.size > max_size:
+            return Response(
+                {
+                    'error': f'File too large. Maximum allowed size is {max_size / (1024*1024)}MB.',
+                    'file_size': input_file.size,
+                    'max_size': max_size
+                },
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            )
+        return None
+
+    def check_duplicate_job(self, request, input_file):
+        """
+        Check if an identical job is already processing for this IP.
+        Prevents accidental double-clicks from spawning multiple tasks.
+        """
+        from .utils import get_client_ip
+        from .models import ConversionJob, JobStatus
+        
+        client_ip = get_client_ip(request)
+        
+        # Look for jobs with same IP, same tool, same size, and PENDING/PROCESSING status
+        # within the last 5 minutes
+        five_minutes_ago = timezone.now() - timedelta(minutes=5)
+        
+        duplicate = ConversionJob.objects.filter(
+            client_ip=client_ip,
+            tool_type=self.tool_type,
+            file_size=input_file.size,
+            status__in=[JobStatus.PENDING, JobStatus.PROCESSING],
+            created_at__gte=five_minutes_ago
+        ).first()
+        
+        if duplicate:
+            return Response(
+                {
+                    'error': 'A similar job is already being processed. Please wait.',
+                    'job_id': str(duplicate.id)
+                },
+                status=status.HTTP_409_CONFLICT
             )
         return None
     

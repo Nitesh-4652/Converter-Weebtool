@@ -34,7 +34,7 @@
             accept: '*/*',
             multiple: true,
             maxFiles: 50,
-            maxFileSize: 100 * 1024 * 1024, // 100MB
+            maxFileSize: 500 * 1024 * 1024, // 500MB
 
             // Form data builder - override to add custom fields
             getFormData: function (file) { return {}; },
@@ -396,7 +396,16 @@
                 .then(async function (response) {
                     if (!response.ok) {
                         var data = await response.json().catch(function () { return {}; });
-                        throw new Error(data.error || data.details || 'Request failed');
+                        if (response.status === 413) {
+                            throw new Error('File too large. Max limit is 500MB.');
+                        }
+                        if (response.status === 429) {
+                            throw new Error('Rate limit exceeded. Try again later.');
+                        }
+                        if (response.status === 409) {
+                            throw new Error('A similar job is already processing.');
+                        }
+                        throw new Error(data.error || data.details || 'Request failed (' + response.status + ')');
                     }
 
                     var contentType = response.headers.get('content-type');

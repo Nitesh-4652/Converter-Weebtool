@@ -68,6 +68,16 @@ class VideoConvertView(BaseConversionView):
         uploaded_file = serializer.validated_data['file']
         output_format = serializer.validated_data['output_format']
         
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+        
         # Build options
         options = {}
         if serializer.validated_data.get('resolution'):
@@ -193,6 +203,17 @@ class VideoTrimView(BaseConversionView):
         
         # Get validated data
         uploaded_file = serializer.validated_data['file']
+        
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+            
         trim_start = serializer.validated_data['start_time']
         trim_end = serializer.validated_data['end_time']
         copy_mode = serializer.validated_data.get('copy_mode', True)

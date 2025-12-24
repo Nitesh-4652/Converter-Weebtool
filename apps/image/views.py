@@ -85,6 +85,16 @@ class ImageConvertView(BaseConversionView):
         uploaded_file = serializer.validated_data['file']
         output_format = serializer.validated_data['output_format']
         
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+        
         # Build options
         options = {'quality': serializer.validated_data.get('quality', 85)}
         if serializer.validated_data.get('width'):

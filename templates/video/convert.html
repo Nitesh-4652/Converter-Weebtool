@@ -280,10 +280,10 @@
                     simulatedProgress = STAGES.CONVERTING.start + stageRatio * (STAGES.CONVERTING.end - STAGES.CONVERTING.start);
                     progressStage.textContent = STAGES.CONVERTING.text + filename;
                 } else {
-                    // Finalizing stage (90-95% - actual 100% comes from completion)
-                    var stageRatio = (progressRatio - 0.9) / 0.05;
-                    simulatedProgress = STAGES.FINALIZING.start + stageRatio * 5; // Max 95%
-                    progressStage.textContent = STAGES.FINALIZING.text;
+                    // Finalizing stage (90-98%)
+                    var stageRatio = Math.min(0.95, (progressRatio - 0.9) / 0.05);
+                    simulatedProgress = STAGES.FINALIZING.start + stageRatio * 8;
+                    progressStage.textContent = STAGES.FINALIZING.text + " (Saving output...)";
                 }
 
                 // Calculate overall progress including previous files

@@ -201,5 +201,12 @@ class HealthCheckSerializer(serializers.Serializer):
     status = serializers.CharField()
     timestamp = serializers.DateTimeField()
     version = serializers.CharField()
-    database = serializers.CharField()
-    ffmpeg = serializers.CharField()
+    
+    # These fields are included based on show_details
+    database = serializers.CharField(required=False)
+    ffmpeg = serializers.CharField(required=False)
+    storage = serializers.CharField(required=False)
+    details = serializers.JSONField(required=False)
+    
+    # This field is included when show_details is False
+    checks = serializers.JSONField(required=False)

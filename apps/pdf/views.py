@@ -182,6 +182,17 @@ class PDFMergeView(BaseConversionView):
         start_time = time.time()
         files = serializer.validated_data['files']
         
+        # 🛡️ HARDENING: File Size Validation (Check all files in list)
+        for f in files:
+            size_response = self.validate_file_size(f)
+            if size_response:
+                return size_response
+                
+        # 🛡️ HARDENING: Duplicate Job Prevention (Check first file as proxy)
+        duplicate_response = self.check_duplicate_job(request, files[0])
+        if duplicate_response:
+            return duplicate_response
+        
         # Save files temporarily
         temp_dir = settings.UPLOAD_DIR / 'temp' / 'merge'
         temp_dir.mkdir(parents=True, exist_ok=True)
@@ -265,6 +276,17 @@ class PDFSplitView(BaseConversionView):
         
         start_time = time.time()
         uploaded_file = serializer.validated_data['file']
+        
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+            
         page_ranges_str = serializer.validated_data.get('page_ranges', '')
         
         # Parse page ranges
@@ -375,6 +397,17 @@ class PDFCompressView(BaseConversionView):
         
         start_time = time.time()
         uploaded_file = serializer.validated_data['file']
+        
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+            
         quality = serializer.validated_data['quality']
         
         # Save file temporarily
@@ -456,6 +489,17 @@ class PDFRotateView(BaseConversionView):
         
         start_time = time.time()
         uploaded_file = serializer.validated_data['file']
+        
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+            
         rotation = int(serializer.validated_data['rotation'])
         pages_str = serializer.validated_data.get('pages', '')
         
@@ -548,6 +592,17 @@ class PDFProtectView(BaseConversionView):
         
         start_time = time.time()
         uploaded_file = serializer.validated_data['file']
+        
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+            
         password = serializer.validated_data['password']
         owner_password = serializer.validated_data.get('owner_password')
         
@@ -629,6 +684,17 @@ class PDFUnlockView(BaseConversionView):
         
         start_time = time.time()
         uploaded_file = serializer.validated_data['file']
+        
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+            
         password = serializer.validated_data['password']
         
         # Save file temporarily
@@ -709,6 +775,18 @@ class ImagesToPDFView(BaseConversionView):
         
         start_time = time.time()
         files = serializer.validated_data['files']
+        
+        # 🛡️ HARDENING: File Size Validation (Check all files in list)
+        for f in files:
+            size_response = self.validate_file_size(f)
+            if size_response:
+                return size_response
+                
+        # 🛡️ HARDENING: Duplicate Job Prevention (Check first file as proxy)
+        duplicate_response = self.check_duplicate_job(request, files[0])
+        if duplicate_response:
+            return duplicate_response
+            
         page_size = serializer.validated_data['page_size']
         
         # Save files temporarily
@@ -798,6 +876,17 @@ class PDFToImagesView(BaseConversionView):
         
         start_time = time.time()
         uploaded_file = serializer.validated_data['file']
+        
+        # 🛡️ HARDENING: File Size Validation
+        size_response = self.validate_file_size(uploaded_file)
+        if size_response:
+            return size_response
+            
+        # 🛡️ HARDENING: Duplicate Job Prevention
+        duplicate_response = self.check_duplicate_job(request, uploaded_file)
+        if duplicate_response:
+            return duplicate_response
+            
         output_format = serializer.validated_data['output_format']
         dpi = serializer.validated_data['dpi']
         

@@ -265,10 +265,10 @@
                     simulatedProgress = STAGES.ENCODING.start + stageRatio * (STAGES.ENCODING.end - STAGES.ENCODING.start);
                     progressStage.textContent = STAGES.ENCODING.text + filename;
                 } else {
-                    // Finalizing (85-95%)
-                    var stageRatio = (progressRatio - 0.85) / 0.1;
-                    simulatedProgress = STAGES.FINALIZING.start + stageRatio * 10;
-                    progressStage.textContent = STAGES.FINALIZING.text;
+                    // Finalizing (85-99%)
+                    var stageRatio = Math.min(0.9, (progressRatio - 0.85) / 0.1);
+                    simulatedProgress = STAGES.FINALIZING.start + stageRatio * 14;
+                    progressStage.textContent = STAGES.FINALIZING.text + " (this may take a moment for large files)";
                 }
 
                 var overallProgress = calculateOverallProgress(currentFileIndex, simulatedProgress);
