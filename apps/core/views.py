@@ -225,41 +225,26 @@ class DownloadFileView(APIView):
                     status=status.HTTP_410_GONE
                 )
             
-            # Get file path and name before serving
+            # Get file path and name
             file_path = converted_file.output_file.path
             file_name = converted_file.output_file.name.split('/')[-1]
             
-            # Read entire file into memory for serving
-            with open(file_path, 'rb') as f:
-                file_content = f.read()
+            if not os.path.exists(file_path):
+                return Response(
+                    {'error': 'File not found on server'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
             
-            # Create response from memory
-            from django.http import HttpResponse
-            response = HttpResponse(
-                file_content,
-                content_type='application/octet-stream'
+            # Use FileResponse for efficient streaming
+            # This is cloud-safe and memory-efficient
+            response = FileResponse(
+                open(file_path, 'rb'),
+                as_attachment=True,
+                filename=file_name
             )
-            response['Content-Disposition'] = f'attachment; filename="{file_name}"'
-            response['Content-Length'] = len(file_content)
             
-            # Cleanup: Delete files after serving
-            try:
-                # Delete output file
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                
-                # Delete input file from conversion job
-                if converted_file.conversion_job:
-                    job = converted_file.conversion_job
-                    if job.input_file and os.path.exists(job.input_file.path):
-                        os.remove(job.input_file.path)
-                    if job.output_file and os.path.exists(job.output_file.path):
-                        os.remove(job.output_file.path)
-                
-                # Delete database records
-                converted_file.delete()
-            except Exception:
-                pass  # Ignore cleanup errors, file was served successfully
+            # Increment download count
+            converted_file.record_download()
             
             return response
             

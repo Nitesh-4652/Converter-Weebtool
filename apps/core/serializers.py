@@ -29,12 +29,18 @@ class ConversionJobSerializer(serializers.ModelSerializer):
         ]
     
     def get_download_url(self, obj):
-        """Get download URL for output file."""
-        if obj.output_file and obj.status == 'completed':
+        """Get API download URL for the resulting file."""
+        # Try to find the associated ConvertedFile record
+        # Note: We prioritize the converted_files relation for accurate ID tracking
+        converted_file = obj.converted_files.first()
+        if converted_file and obj.status == 'completed':
+            from django.urls import reverse
             request = self.context.get('request')
+            # Use the dedicated download API endpoint
+            download_path = reverse('core:download-file', kwargs={'file_id': converted_file.id})
             if request:
-                return request.build_absolute_uri(obj.output_file.url)
-            return obj.output_file.url
+                return request.build_absolute_uri(download_path)
+            return download_path
         return None
 
 
@@ -175,12 +181,14 @@ class ConvertedFileSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'download_count']
     
     def get_download_url(self, obj):
-        """Get download URL for output file."""
+        """Get API download URL for the output file."""
         if obj.output_file and not obj.is_expired:
+            from django.urls import reverse
             request = self.context.get('request')
+            download_path = reverse('core:download-file', kwargs={'file_id': obj.id})
             if request:
-                return request.build_absolute_uri(obj.output_file.url)
-            return obj.output_file.url
+                return request.build_absolute_uri(download_path)
+            return download_path
         return None
 
 
