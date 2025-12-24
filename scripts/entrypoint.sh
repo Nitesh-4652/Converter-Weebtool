@@ -3,17 +3,16 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "🚀 Starting Production Entrypoint..."
+echo "🚀 Starting Converter SaaS..."
 
-# Apply database migrations
-echo "📦 Applying database migrations..."
+# Run migrations
+echo "📦 Running database migrations..."
 python manage.py migrate --noinput
 
-# Collect static files (already done in Dockerfile, but safe to repeat if needed)
-# echo "🎨 Collecting static files..."
-# python manage.py collectstatic --noinput
+# Collect static files
+echo "📁 Collecting static files..."
+python manage.py collectstatic --noinput || true
 
-echo "✅ Migrations complete. Starting server..."
-
-# Start Gunicorn
-exec gunicorn --bind 0.0.0.0:8000 config.wsgi:application
+# Start Gunicorn with config file
+echo "🌐 Starting Gunicorn server with optimized configuration..."
+exec gunicorn config.wsgi:application --config gunicorn.conf.py

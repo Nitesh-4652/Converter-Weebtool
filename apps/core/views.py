@@ -245,6 +245,9 @@ class DownloadFileView(APIView):
                 filename=file_name
             )
             
+            # Add CORS header to expose Content-Disposition for blob downloads
+            response['Access-Control-Expose-Headers'] =  'Content-Disposition, Content-Type, Content-Length'
+            
             # Increment download count
             converted_file.record_download()
             

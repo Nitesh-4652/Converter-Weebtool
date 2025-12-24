@@ -152,13 +152,21 @@ CORS_ALLOWED_ORIGINS = os.environ.get(
 
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development
 
+# Expose headers for download functionality
+CORS_EXPOSE_HEADERS = [
+    'Content-Disposition',
+    'Content-Type',
+    'Content-Length',
+]
+
 # CSRF Configuration for Ngrok and Railway
 CSRF_TRUSTED_ORIGINS = ['https://*.ngrok.io', 'https://*.ngrok-free.app', 'https://*.ngrok-free.dev', 'https://*.railway.app', 'https://*.up.railway.app']
 
 
 # File Upload Configuration
-FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024  # 100MB
+# Increased to 500MB to support large video files
+FILE_UPLOAD_MAX_MEMORY_SIZE = 500 * 1024 * 1024  # 500MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 500 * 1024 * 1024  # 500MB
 MAX_UPLOAD_SIZE = 500 * 1024 * 1024  # 500MB max file size
 
 

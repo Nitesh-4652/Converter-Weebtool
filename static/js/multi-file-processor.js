@@ -669,19 +669,35 @@
     MultiFileProcessor.prototype.handleDownloadClick = function (url, filename) {
         var self = this;
 
-        // Show a brief loading indicator
-        console.log('Downloading:', filename);
+        console.log('[Download] Starting download:', filename);
+        console.log('[Download] URL:', url);
 
-        fetch(url)
+        fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin'
+        })
             .then(function (response) {
+                console.log('[Download] Response status:', response.status);
+                console.log('[Download] Response headers:', {
+                    contentType: response.headers.get('Content-Type'),
+                    contentLength: response.headers.get('Content-Length'),
+                    contentDisposition: response.headers.get('Content-Disposition')
+                });
+
                 if (!response.ok) {
-                    throw new Error('Download failed: ' + response.status);
+                    throw new Error('Download failed: HTTP ' + response.status + ' ' + response.statusText);
                 }
+
                 return response.blob();
             })
             .then(function (blob) {
+                console.log('[Download] Blob created successfully');
+                console.log('[Download] Blob size:', blob.size, 'bytes');
+                console.log('[Download] Blob type:', blob.type);
+
                 // Create a temporary object URL
                 var blobUrl = URL.createObjectURL(blob);
+                console.log('[Download] Object URL created:', blobUrl);
 
                 // Create a temporary link and trigger download
                 var tempLink = document.createElement('a');
@@ -689,17 +705,43 @@
                 tempLink.download = filename;
                 tempLink.style.display = 'none';
                 document.body.appendChild(tempLink);
+
+                console.log('[Download] Triggering programmatic click...');
                 tempLink.click();
 
                 // Clean up
                 setTimeout(function () {
                     document.body.removeChild(tempLink);
                     URL.revokeObjectURL(blobUrl);
+                    console.log('[Download] Cleanup complete');
                 }, 100);
             })
             .catch(function (error) {
-                console.error('Download error:', error);
-                alert('Download failed. Please try again.');
+                console.error('[Download] Error occurred:', error);
+                console.error('[Download] Error details:', error.message, error.stack);
+
+                // Attempt fallback: try direct window.open
+                console.log('[Download] Attempting fallback: window.open');
+                try {
+                    var fallbackWindow = window.open(url, '_blank');
+
+                    if (!fallbackWindow || fallbackWindow.closed || typeof fallbackWindow.closed === 'undefined') {
+                        console.error('[Download] Fallback failed: popup blocked');
+                        // Show user-friendly error
+                        alert(
+                            'Download failed. Your browser may be blocking downloads.\n\n' +
+                            'Please try:\n' +
+                            '1. Right-click the download link and select "Save As"\n' +
+                            '2. Check if popup blockers are enabled\n' +
+                            '3. Try a different browser'
+                        );
+                    } else {
+                        console.log('[Download] Fallback successful');
+                    }
+                } catch (fallbackError) {
+                    console.error('[Download] Fallback error:', fallbackError);
+                    alert('Download failed. Please right-click the link and select "Save As".');
+                }
             });
     };
 
