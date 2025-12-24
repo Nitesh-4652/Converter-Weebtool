@@ -1,38 +1,30 @@
 """
 Celery Compatibility Layer.
 Provides fallback decorators when Celery is not installed.
-This allows the app to work with or without Celery.
-
-Usage:
-    from apps.core.celery_compat import shared_task, Task, CELERY_AVAILABLE
-    
-    @shared_task
-    def my_task():
-        pass
+Uses dependency_guard for safe detection.
 """
 
 import logging
 import functools
+from apps.core.dependency_guard import CELERY_AVAILABLE
 
 logger = logging.getLogger(__name__)
 
-# Try to import Celery
-try:
-    from celery import shared_task as celery_shared_task, Task as CeleryTask
-    CELERY_AVAILABLE = True
-    logger.info("Celery is available - async tasks enabled")
-except ImportError:
-    CELERY_AVAILABLE = False
-    logger.info("Celery not installed - tasks will run synchronously")
+# Try to import Celery objects if available
+if CELERY_AVAILABLE:
+    try:
+        from celery import shared_task as celery_shared_task, Task as CeleryTask
+    except ImportError:
+        CELERY_AVAILABLE = False
+        celery_shared_task = None
+        CeleryTask = None
+else:
     celery_shared_task = None
     CeleryTask = None
 
 
 class SyncTask:
-    """
-    Fallback base task class when Celery is not available.
-    Mimics Celery Task interface for compatibility.
-    """
+    """Fallback base task class when Celery is not available."""
     
     # Task name (set by decorator)
     name = None
@@ -56,9 +48,7 @@ class SyncTask:
 
 
 def make_sync_task(func, base_class=None):
-    """
-    Create a synchronous task wrapper that mimics Celery task behavior.
-    """
+    """Create a synchronous task wrapper that mimics Celery task behavior."""
     
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -97,21 +87,12 @@ def shared_task(*args, **kwargs):
     """
     Drop-in replacement for celery.shared_task.
     Uses real Celery if available, otherwise runs synchronously.
-    
-    Supports all common Celery task options:
-    - bind=True
-    - base=BaseClass
-    - autoretry_for=(Exception,)
-    - retry_backoff=True
-    - max_retries=3
     """
     
     def decorator(func):
         if CELERY_AVAILABLE:
-            # Use real Celery shared_task
             return celery_shared_task(*args, **kwargs)(func)
         else:
-            # Use sync wrapper
             base_class = kwargs.get('base')
             bind = kwargs.get('bind', False)
             
@@ -122,7 +103,7 @@ def shared_task(*args, **kwargs):
             else:
                 return make_sync_task(func)
     
-    # Check if called as @shared_task (no parentheses, direct function)
+    # Check if called as @shared_task (no parentheses)
     if len(args) == 1 and callable(args[0]) and not kwargs:
         func = args[0]
         return make_sync_task(func)
@@ -130,7 +111,6 @@ def shared_task(*args, **kwargs):
     return decorator
 
 
-# Export Task class - use Celery's if available, otherwise use SyncTask
 if CELERY_AVAILABLE:
     Task = CeleryTask
 else:

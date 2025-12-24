@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any, Tuple
 
 from PIL import Image
 from django.conf import settings
+from apps.core.dependency_guard import CAIROSVG_AVAILABLE, HEIF_AVAILABLE
 
 
 class ImageConversionError(Exception):
@@ -153,6 +154,8 @@ def convert_svg_to_image(
     options = options or {}
     
     try:
+        if not CAIROSVG_AVAILABLE:
+            raise ImportError
         import cairosvg
         
         # First convert to PNG
@@ -209,6 +212,8 @@ def convert_heic_to_image(
     options = options or {}
     
     try:
+        if not HEIF_AVAILABLE:
+            raise ImportError
         from pillow_heif import register_heif_opener
         register_heif_opener()
         

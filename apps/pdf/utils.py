@@ -10,8 +10,22 @@ from typing import Optional, Dict, Any, List
 
 from PIL import Image
 from PyPDF2 import PdfReader, PdfWriter, PdfMerger
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
+from apps.core.dependency_guard import REPORTLAB_AVAILABLE, get_reportlab_canvas, get_reportlab_pagesizes
+
+# Lazy ReportLab imports handled inside functions
+canvas = None
+A4 = None
+letter = None
+
+def _ensure_reportlab():
+    """Ensure ReportLab globals are populated if available."""
+    global canvas, A4, letter
+    if REPORTLAB_AVAILABLE and canvas is None:
+        canvas = get_reportlab_canvas()
+        ps = get_reportlab_pagesizes()
+        if ps:
+            A4 = ps.A4
+            letter = ps.letter
 
 
 class PDFError(Exception):
@@ -349,7 +363,9 @@ def images_to_pdf(
         Output file path
     """
     try:
-        # Get page size
+        _ensure_reportlab()
+        
+        # Get page size (only if ReportLab available, otherwise PIL handles it differently)
         size = A4 if page_size == 'A4' else letter
         
         images = []
